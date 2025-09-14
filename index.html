@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>JustiBot — Advanced AI Legal Assistant with Open AI</title>
+  <title>JustiBot — Advanced AI Legal Assistant</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -39,26 +39,25 @@
         var(--bg);
       line-height:1.6;
     }
- .brand-logo {
-  height: 10%; /* Reduced from 110px to better fit navigation */
-  width: 20%;
-  display: block;
-  object-fit: contain;
-}
+    .brand-logo {
+      height: 10%;
+      width: 20%;
+      display: block;
+      object-fit: contain;
+    }
 
-/* Fallback if logo doesn't load */
-.logo-placeholder {
-  width: 100px; /* Increased from 34px to match logo size */
-  height: 100px; /* Increased from 34px to match logo size */
-  background: linear-gradient(135deg, var(--primary), #6db2ff);
-  border-radius: 10px;
-  display: none; /* Hidden by default */
-  place-items: center;
-  color: #fff;
-  font-weight: 900;
-  box-shadow: 0 6px 18px rgba(43,134,255,.35);
-  font-size: 18px; /* Slightly larger text for better proportion */
-}
+    .logo-placeholder {
+      width: 100px;
+      height: 100px;
+      background: linear-gradient(135deg, var(--primary), #6db2ff);
+      border-radius: 10px;
+      display: none;
+      place-items: center;
+      color: #fff;
+      font-weight: 900;
+      box-shadow: 0 6px 18px rgba(43,134,255,.35);
+      font-size: 18px;
+    }
     .nav{
       position:sticky;top:0;z-index:50;
       background:rgba(255,255,255,.7);
@@ -249,7 +248,8 @@
     .input-action.primary:hover{background:var(--primary-600)}
     
     .api-toggle{
-      display:flex;gap:8px;align-items:center;font-size:12px;color:var(--muted);margin-bottom:10px;
+      display:none; /* Hidden as requested */
+      gap:8px;align-items:center;font-size:12px;color:var(--muted);margin-bottom:10px;
       justify-content:flex-end;
     }
     .toggle-switch {
@@ -403,31 +403,31 @@
 </head>
 <body>
   <!-- Nav -->
- <header class="nav">
-  <div class="wrap">
-    <div class="brand reveal reveal-left">
-      <img src="/logo.png" alt="JustiBot Logo" class="brand-logo">
-      <div>JustiBot</div>
+  <header class="nav">
+    <div class="wrap">
+      <div class="brand reveal reveal-left">
+        <img src="/logo.png" alt="JustiBot Logo" class="brand-logo">
+        <div>JustiBot</div>
+      </div>
+      <nav class="links">
+        <a href="#features">Features</a>
+        <a href="#advanced">Advanced</a>
+        <a href="#how">How it works</a>
+        <a class="btn btn-ghost" href="#demo">Demo</a>
+        <a class="btn btn-primary" href="#get-started">Get Started</a>
+      </nav>
     </div>
-    <nav class="links">
-      <a href="#features">Features</a>
-      <a href="#advanced">Advanced</a>
-      <a href="#how">How it works</a>
-      <a class="btn btn-ghost" href="#demo">Demo</a>
-      <a class="btn btn-primary" href="#get-started">Get Started</a>
-    </nav>
-  </div>
-</header>
+  </header>
 
   <!-- Hero -->
   <section class="hero" id="home">
     <div class="reveal">
       <div class="pill">India‑ready AI for legal work</div>
       <h1 class="h1">Welcome To <span>Next-Generation</span> AI Legal Assistant</h1>
-      <p class="lead">Multi-document analysis, predictive analytics, and now powered by Open AI for comprehensive legal assistance.</p>
+      <p class="lead">Multi-document analysis, predictive analytics, and comprehensive legal assistance powered by advanced AI.</p>
       <div class="cta-row">
         <a class="btn btn-primary" href="#get-started">Start Free</a>
-        <a class="btn btn-orange" href="#demo">Try Open AI</a>
+        <a class="btn btn-orange" href="#demo">Try AI Assistant</a>
         <a class="btn btn-ghost" href="#how">Watch Demo</a>
       </div>
       <div class="trust reveal reveal-delay-1">
@@ -443,7 +443,7 @@
           <div class="tab" data-tab="draft">Draft</div>
           <div class="tab" data-tab="judgment">Judgments</div>
           <div class="tab" data-tab="advanced">Advanced</div>
-          <div class="tab" data-tab="grok">open AI</div>
+          <div class="tab" data-tab="grok">AI Analysis</div>
         </div>
         <div class="pill" style="background:#ecfff6;border-color:rgba(62,207,142,.35);color:#0e7a4f">Live Preview</div>
       </div>
@@ -523,7 +523,7 @@
       </div>
       <div class="card reveal reveal-delay-1">
         <div class="icon orange">G</div>
-        <h3>Open AI Integration</h3>
+        <h3>AI Integration</h3>
         <p>Access advanced AI capabilities for complex legal reasoning and analysis.</p>
       </div>
       <div class="card reveal reveal-delay-2">
@@ -538,7 +538,7 @@
   <section class="section" id="advanced">
     <span class="kicker reveal">Advanced Capabilities</span>
     <h2 class="h2 reveal reveal-delay-1">Features beyond standard legal AI</h2>
-    <p class="muted reveal reveal-delay-2">LexiAssist offers enterprise-grade tools not found in other legal AI platforms.</p>
+    <p class="muted reveal reveal-delay-2">JustiBot offers enterprise-grade tools not found in other legal AI platforms.</p>
 
     <div class="feature-grid">
       <div class="feature-card reveal">
@@ -565,8 +565,8 @@
       <div class="feature-card reveal reveal-delay-3">
         <div class="feature-icon orange">G</div>
         <div class="feature-content">
-          <h3>Open AI Enhanced Analysis</h3>
-          <p>Leverage Grok's powerful AI for deeper legal reasoning, hypothetical scenario testing, and comprehensive explanations.</p>
+          <h3>AI Enhanced Analysis</h3>
+          <p>Leverage powerful AI for deeper legal reasoning, hypothetical scenario testing, and comprehensive explanations.</p>
         </div>
       </div>
       <div class="feature-card reveal">
@@ -618,8 +618,8 @@
       </div>
       <div class="card reveal reveal-delay-2">
         <div class="icon orange">3</div>
-        <h3>Enhance with Open Ai</h3>
-        <p>Toggle JustiBot AI for advanced analysis, hypotheticals, and comprehensive explanations.</p>
+        <h3>Enhance with AI</h3>
+        <p>Use advanced AI for deeper analysis, hypotheticals, and comprehensive explanations.</p>
       </div>
     </div>
   </section>
@@ -680,32 +680,14 @@ const uploadBtn = document.getElementById('uploadBtn');
 const grokToggle = document.getElementById('grokToggle');
 const quickReplies = document.getElementById('quickReplies');
 
-// Add an OpenAI toggle next to Grok (if not present)
-(function ensureOpenAIToggle() {
-  const apiToggle = document.querySelector('.api-toggle');
-  if (!apiToggle) return;
-  if (!document.getElementById('openAIToggle')) {
-    const wrap = document.createElement('div');
-    wrap.style.display = 'flex';
-    wrap.style.gap = '8px';
-    wrap.style.alignItems = 'center';
-    wrap.style.fontSize = '12px';
-    wrap.style.color = 'var(--muted)';
-    wrap.innerHTML = '<span>Use OpenAI</span> <label class="toggle-switch"> <input type="checkbox" id="openAIToggle" checked> <span class="slider"></span> </label>';
-    apiToggle.prepend(wrap);
-  }
-})();
+// Hide the OpenAI toggle as requested
+document.querySelector('.api-toggle').style.display = 'none';
 
-const openAIToggle = document.getElementById('openAIToggle');
-
-// Maintain simple conversation history for OpenAI context
-const chatHistory = []; // array of {role:'user'|'assistant', content:''}
-
-// Global flags
-let useStreaming = false; // set true to use SSE streaming from /openai/chat-stream
+// Maintain conversation history for context
+const chatHistory = [];
 
 // =====================
-// Tabs behavior (no hardcoded demo text)
+// Tabs behavior
 // =====================
 tabs.forEach(t => t.addEventListener('click', () => {
   tabs.forEach(x => x.classList.remove('active'));
@@ -713,15 +695,12 @@ tabs.forEach(t => t.addEventListener('click', () => {
   input.focus();
   const tabName = t.getAttribute('data-tab');
   
-  // Keep UX feedback minimal and neutral
   if (tabName === 'advanced') {
     appendBubble('Advanced features panel open.', 'bot', true);
   } else if (tabName === 'grok') {
-    appendBubble('Grok AI panel open.', 'bot', true);
-    if (grokToggle) grokToggle.checked = true;
+    appendBubble('AI Analysis panel open.', 'bot', true);
   } else if (tabName === 'chat') {
     appendBubble('Standard chat panel open.', 'bot', true);
-    if (grokToggle) grokToggle.checked = false;
   }
 }));
 
@@ -747,7 +726,7 @@ function appendBubble(text, who = 'me', isSystem = false, isGrok = false) {
   if (isGrok) {
     b.className = 'bubble grok';
     const formattedText = (text || '').replace(/\n/g, '<br>');
-    b.innerHTML = '<strong>Grok AI:</strong><div style="margin-top: 5px;">' + formattedText + '</div>';
+    b.innerHTML = '<strong>AI Analysis:</strong><div style="margin-top: 5px;">' + formattedText + '</div>';
   } else if (isSystem) {
     b.className = 'bubble system';
     b.textContent = text || '';
@@ -768,7 +747,7 @@ function appendBubble(text, who = 'me', isSystem = false, isGrok = false) {
   
   chatArea.appendChild(b);
   chatArea.scrollTop = chatArea.scrollHeight;
-  return b; // return bubble element (useful for streaming updates)
+  return b;
 }
 
 function showTypingIndicator() {
@@ -788,81 +767,27 @@ function hideTypingIndicator() {
 // =====================
 // API callers
 // =====================
-async function callGrokAPI(text) {
-  const res = await fetch('/grok-chat', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message: text })
-  });
-  if (!res.ok) throw new Error('Grok API error');
-  return res.json();
-}
-
-async function callOpenAI(text, { history = chatHistory, stream = useStreaming } = {}) {
-  if (!stream) {
+async function callOpenAI(text, history = chatHistory) {
+  try {
     const res = await fetch('/openai/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         message: text,
         history,
-        model: 'gpt-4o-mini',
+        model: 'gpt-4',
         temperature: 0.2,
         max_tokens: 900
       })
     });
+    
     if (!res.ok) throw new Error('OpenAI chat error');
-    return res.json(); // {response}
+    const data = await res.json();
+    return data;
+  } catch (error) {
+    console.error('API call failed:', error);
+    return { response: "I'm having trouble connecting to the AI service. Please try again." };
   }
-  
-  // Streaming via SSE with fetch ReadableStream
-  const res = await fetch('/openai/chat-stream', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      message: text,
-      history,
-      model: 'gpt-4o-mini',
-      temperature: 0.2,
-      max_tokens: 900
-    })
-  });
-  
-  if (!res.ok || !res.body) {
-    throw new Error('OpenAI stream error');
-  }
-  
-  // Prepare a bot bubble to progressively fill
-  const streamBubble = appendBubble('', 'bot');
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder('utf-8');
-  let acc = '';
-  
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    
-    const chunk = decoder.decode(value, { stream: true });
-    // SSE: lines prefixed with "data:"
-    const lines = chunk.split('\n');
-    
-    for (const line of lines) {
-      if (!line.startsWith('data:')) continue;
-      const payload = line.slice(5).trim();
-      if (!payload) continue;
-      if (payload === '[DONE]') break;
-      if (payload.startsWith('[ERROR]')) {
-        streamBubble.innerHTML = 'Error: ' + payload.replace('[ERROR]', '').trim();
-        return { response: streamBubble.textContent || 'Error' };
-      }
-      
-      acc += payload;
-      streamBubble.innerHTML = (acc || '').replace(/\n/g, '<br>') + streamBubble.querySelector('.bubble-time').outerHTML;
-    }
-  }
-  
-  // Return as if JSON shape to keep caller uniform
-  return { response: acc };
 }
 
 // =====================
@@ -875,36 +800,21 @@ async function sendMessage() {
   appendBubble(text, 'me');
   input.value = '';
   
-  // Maintain history for OpenAI (user turn)
+  // Maintain history for context (user turn)
   chatHistory.push({ role: 'user', content: text });
-  
-  const useGrok = grokToggle && grokToggle.checked;
-  const useOpenAI = openAIToggle ? openAIToggle.checked : true;
   
   showTypingIndicator();
   
   try {
-    let data;
-    if (useGrok && !useOpenAI) {
-      // Grok path
-      data = await callGrokAPI(text);
-      hideTypingIndicator();
-      if (data && data.response) {
-        appendBubble(data.response, 'bot', false, true);
-        chatHistory.push({ role: 'assistant', content: stripHTML(data.response) });
-      } else {
-        appendBubble('No response from Grok server', 'bot');
-      }
+    const data = await callOpenAI(text, chatHistory);
+    hideTypingIndicator();
+    
+    if (data && data.response) {
+      appendBubble(data.response, 'bot');
+      // Maintain history for context (assistant turn)
+      chatHistory.push({ role: 'assistant', content: stripHTML(data.response) });
     } else {
-      // OpenAI default path (non-stream or stream)
-      data = await callOpenAI(text, { history: chatHistory, stream: useStreaming });
-      hideTypingIndicator();
-      if (data && data.response) {
-        appendBubble(data.response, 'bot');
-        chatHistory.push({ role: 'assistant', content: stripHTML(data.response) });
-      } else {
-        appendBubble('No response from OpenAI server', 'bot');
-      }
+      appendBubble('No response from server. Please try again.', 'bot');
     }
   } catch (err) {
     hideTypingIndicator();
@@ -928,16 +838,16 @@ if (uploadBtn) {
     const docText = prompt('Paste document text for analysis (max 5000 characters):');
     if (docText && docText.trim()) {
       appendBubble('Uploading document for analysis...', 'bot', true);
-      fetch('/upload', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: docText })
-      })
-      .then(res => res.json())
-      .then(() => {
+      
+      // Add document to chat history
+      chatHistory.push({ 
+        role: 'user', 
+        content: `[DOCUMENT UPLOADED]: ${docText.substring(0, 1000)}${docText.length > 1000 ? '...' : ''}` 
+      });
+      
+      setTimeout(() => {
         appendBubble('✅ Document uploaded. Ask to analyze or summarize it.', 'bot', true);
-      })
-      .catch(() => appendBubble('Upload failed. Please try again.', 'bot', true));
+      }, 1000);
     }
   });
 }
@@ -969,7 +879,7 @@ if (clearChatBtn) {
 }
 
 // =====================
-// Enterprise modal wiring (unchanged)
+// Enterprise modal wiring
 // =====================
 const enterpriseModal = document.getElementById('enterpriseModal');
 const enterpriseBtn = document.getElementById('enterpriseBtn');
@@ -1004,29 +914,13 @@ input.addEventListener('keydown', (e) => {
 btn.addEventListener('click', sendMessage);
 
 // =====================
-// Toggles
+// Initial greeting
 // =====================
-if (grokToggle) {
-  grokToggle.addEventListener('change', function () {
-    if (this.checked) {
-      appendBubble('Grok AI enabled.', 'bot', true);
-      if (openAIToggle) openAIToggle.checked = false; // optional mutual exclusion
-    } else {
-      appendBubble('Grok AI disabled.', 'bot', true);
-    }
-  });
+function appendInitialGreeting() {
+  appendBubble("Hello! I'm JustiBot, your AI legal assistant. I can help with legal research, document analysis, drafting, and more. How can I assist you today?", 'bot');
 }
 
-if (openAIToggle) {
-  openAIToggle.addEventListener('change', function () {
-    if (this.checked) {
-      appendBubble('OpenAI enabled.', 'bot', true);
-      if (grokToggle) grokToggle.checked = false; // optional mutual exclusion
-    } else {
-      appendBubble('OpenAI disabled.', 'bot', true);
-    }
-  });
-}
+appendInitialGreeting();
 
 // =====================
 // Focus handling
@@ -1034,15 +928,6 @@ if (openAIToggle) {
 document.addEventListener('click', () => {
   input && input.focus();
 });
-
-// =====================
-/* Initial greeting: keep neutral and non-hardcoded claims. */
-// =====================
-function appendInitialGreeting() {
-  appendBubble("Hello! How can I assist with your legal research or drafting today?", 'bot');
-}
-
-appendInitialGreeting();
 </script>
 </body>
 </html>
