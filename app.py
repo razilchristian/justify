@@ -1,5 +1,7 @@
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from openai import OpenAI
 import os
 import json
@@ -11,17 +13,85 @@ import re
 import time
 import pandas as pd
 import numpy as np
+import sqlite3
+from contextlib import contextmanager
+import logging
+from logging.handlers import RotatingFileHandler
 
 app = Flask(__name__)
 CORS(app)
+
+# Initialize rate limiting
+limiter = Limiter(
+    app=app,
+    key_func=get_remote_address,
+    default_limits=["200 per day", "50 per hour"]
+)
 
 # Initialize OpenAI (you'll need to set your API key in environment variables)
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 
-# In-memory storage for demo purposes (use a database in production)
-chat_sessions = {}
-uploaded_documents = {}
+# Set up logging
+if not app.debug:
+    file_handler = RotatingFileHandler('legal_assistant.log', maxBytes=10240, backupCount=10)
+    file_handler.setFormatter(logging.Formatter(
+        '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
+    ))
+    file_handler.setLevel(logging.INFO)
+    app.logger.addHandler(file_handler)
+    app.logger.setLevel(logging.INFO)
+    app.logger.info('Legal Assistant startup')
+
+# Database setup
+def get_db():
+    conn = sqlite3.connect('legal_assistant.db')
+    conn.row_factory = sqlite3.Row
+    return conn
+
+@contextmanager
+def db_connection():
+    conn = get_db()
+    try:
+        yield conn
+    finally:
+        conn.close()
+
+def init_db():
+    with db_connection() as conn:
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS chat_sessions (
+                id TEXT PRIMARY KEY,
+                history TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS uploaded_documents (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id TEXT,
+                text TEXT,
+                filename TEXT,
+                file_type TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (session_id) REFERENCES chat_sessions (id)
+            )
+        ''')
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS api_usage (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                endpoint TEXT,
+                ip_address TEXT,
+                usage_count INTEGER DEFAULT 1,
+                last_used TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        conn.commit()
+
+# Initialize database
+init_db()
 
 # System prompt for legal assistant
 LEGAL_ASSISTANT_PROMPT = """
@@ -83,7 +153,7 @@ class LegalDatabase:
                 self.cases = df.to_dict('records')
             return len(self.cases)
         except Exception as e:
-            print(f"Error loading cases: {e}")
+            app.logger.error(f"Error loading cases: {e}")
             # Return dummy data if file not found
             self.cases = [
                 {
@@ -130,14 +200,58 @@ legal_db = LegalDatabase()
 
 def preload_training_data():
     """Pre-load training data and cases at startup"""
-    print("Loading legal cases...")
+    app.logger.info("Loading legal cases...")
     num_cases = legal_db.load_cases_from_csv("data/legal_cases.csv")
     
-    print("Loading training data...")
+    app.logger.info("Loading training data...")
     num_training = legal_db.load_training_data()
     
-    print(f"Loaded {num_cases} legal cases and {num_training} training examples")
+    app.logger.info(f"Loaded {num_cases} legal cases and {num_training} training examples")
     return num_cases, num_training
+
+def track_api_usage(endpoint):
+    """Track API usage for rate limiting and analytics"""
+    ip_address = get_remote_address()
+    with db_connection() as conn:
+        # Check if this IP has used this endpoint recently
+        cursor = conn.execute(
+            "SELECT * FROM api_usage WHERE endpoint = ? AND ip_address = ?",
+            (endpoint, ip_address)
+        )
+        existing = cursor.fetchone()
+        
+        if existing:
+            # Update existing record
+            conn.execute(
+                "UPDATE api_usage SET usage_count = usage_count + 1, last_used = CURRENT_TIMESTAMP WHERE id = ?",
+                (existing['id'],)
+            )
+        else:
+            # Create new record
+            conn.execute(
+                "INSERT INTO api_usage (endpoint, ip_address) VALUES (?, ?)",
+                (endpoint, ip_address)
+            )
+        conn.commit()
+
+def extract_text_from_pdf(file_content):
+    """Improved PDF text extraction function"""
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp:
+            tmp.write(file_content)
+            tmp_path = tmp.name
+        
+        text = ""
+        with open(tmp_path, 'rb') as file:
+            reader = PyPDF2.PdfReader(file)
+            for page in reader.pages:
+                text += page.extract_text() + "\n"
+        
+        os.unlink(tmp_path)
+        return text
+    except Exception as e:
+        app.logger.error(f"PDF extraction error: {e}")
+        return ""
 
 @app.route('/')
 def serve_index():
@@ -147,15 +261,27 @@ def serve_index():
         return "HTML file not found. Please make sure index.html is in the same directory."
 
 @app.route('/openai/chat', methods=['POST'])
+@limiter.limit("10 per minute")
 def chat_with_openai():
     try:
+        track_api_usage('/openai/chat')
+        
         if not client:
             return jsonify({"error": "OpenAI API key not configured"}), 500
             
         data = request.json
         user_message = data.get('message', '')
         history = data.get('history', [])
+        session_id = data.get('session_id', 'default')
         model = data.get('model', 'gpt-3.5-turbo')
+        
+        # Save chat history to database
+        with db_connection() as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO chat_sessions (id, history, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)",
+                (session_id, json.dumps(history + [{"role": "user", "content": user_message}]))
+            )
+            conn.commit()
         
         # Prepare messages with system prompt and history
         messages = [{"role": "system", "content": LEGAL_ASSISTANT_PROMPT}]
@@ -177,42 +303,68 @@ def chat_with_openai():
         
         ai_response = response.choices[0].message.content
         
+        # Update chat history with AI response
+        with db_connection() as conn:
+            conn.execute(
+                "UPDATE chat_sessions SET history = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (json.dumps(history + [
+                    {"role": "user", "content": user_message},
+                    {"role": "assistant", "content": ai_response}
+                ]), session_id)
+            )
+            conn.commit()
+        
         return jsonify({"response": ai_response})
     
     except Exception as e:
-        print(f"OpenAI API error: {e}")
+        app.logger.error(f"OpenAI API error: {e}")
         return jsonify({"error": "I'm having trouble connecting to the AI service. Please try again."}), 500
 
 @app.route('/openai/chat-stream', methods=['POST'])
+@limiter.limit("10 per minute")
 def chat_with_openai_stream():
     # This would implement streaming responses
     # For simplicity, we'll use the non-streaming version in this demo
     return chat_with_openai()
 
 @app.route('/upload', methods=['POST'])
+@limiter.limit("20 per hour")
 def upload_document():
     try:
+        track_api_usage('/upload')
+        
         data = request.json
         text = data.get('text', '')
         session_id = data.get('session_id', 'default')
+        filename = data.get('filename', 'document')
+        file_type = data.get('file_type', 'text')
         
-        if session_id not in uploaded_documents:
-            uploaded_documents[session_id] = []
+        # If it's a PDF, extract text
+        if file_type == 'pdf' and text.startswith('data:application/pdf;base64,'):
+            import base64
+            base64_data = text.split(',', 1)[1]
+            file_content = base64.b64decode(base64_data)
+            text = extract_text_from_pdf(file_content)
         
-        # Store document (in production, you'd store this properly)
-        uploaded_documents[session_id].append({
-            'text': text[:5000],  # Limit size for demo
-            'timestamp': datetime.now().isoformat()
-        })
+        with db_connection() as conn:
+            conn.execute(
+                "INSERT INTO uploaded_documents (session_id, text, filename, file_type) VALUES (?, ?, ?, ?)",
+                (session_id, text[:10000], filename, file_type)  # Limit text size
+            )
+            conn.commit()
         
         return jsonify({"status": "success", "message": "Document uploaded successfully"})
     
     except Exception as e:
+        app.logger.error(f"Upload error: {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/analyze-documents', methods=['POST'])
+@limiter.limit("15 per hour")
 def analyze_documents():
     try:
+        track_api_usage('/analyze-documents')
+        
         if not client:
             return jsonify({"error": "OpenAI API key not configured"}), 500
             
@@ -220,11 +372,19 @@ def analyze_documents():
         session_id = data.get('session_id', 'default')
         question = data.get('question', '')
         
-        if session_id not in uploaded_documents or not uploaded_documents[session_id]:
+        # Get documents from database
+        with db_connection() as conn:
+            cursor = conn.execute(
+                "SELECT text FROM uploaded_documents WHERE session_id = ? ORDER BY created_at DESC",
+                (session_id,)
+            )
+            documents = cursor.fetchall()
+        
+        if not documents:
             return jsonify({"error": "No documents found for analysis"}), 400
         
         # Get all uploaded documents
-        documents_text = "\n\n".join([doc['text'] for doc in uploaded_documents[session_id]])
+        documents_text = "\n\n".join([doc['text'] for doc in documents])
         
         # Prepare analysis prompt
         analysis_prompt = f"""
@@ -258,11 +418,15 @@ def analyze_documents():
         return jsonify({"analysis": analysis})
     
     except Exception as e:
+        app.logger.error(f"Analysis error: {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/draft-document', methods=['POST'])
+@limiter.limit("10 per hour")
 def draft_document():
     try:
+        track_api_usage('/draft-document')
+        
         if not client:
             return jsonify({"error": "OpenAI API key not configured"}), 500
             
@@ -300,11 +464,15 @@ def draft_document():
         return jsonify({"draft": draft})
     
     except Exception as e:
+        app.logger.error(f"Drafting error: {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/find-judgments', methods=['POST'])
+@limiter.limit("15 per hour")
 def find_judgments():
     try:
+        track_api_usage('/find-judgments')
+        
         data = request.json
         issue = data.get('issue', '')
         jurisdiction = data.get('jurisdiction', 'Supreme Court of India')
@@ -365,11 +533,15 @@ def find_judgments():
             })
     
     except Exception as e:
+        app.logger.error(f"Judgment search error: {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/export-docx', methods=['POST'])
+@limiter.limit("10 per hour")
 def export_docx():
     try:
+        track_api_usage('/export-docx')
+        
         data = request.json
         content = data.get('content', '')
         filename = data.get('filename', 'legal_document')
@@ -400,11 +572,15 @@ def export_docx():
         )
     
     except Exception as e:
+        app.logger.error(f"Export error: {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/predict-outcome', methods=['POST'])
+@limiter.limit("10 per hour")
 def predict_outcome():
     try:
+        track_api_usage('/predict-outcome')
+        
         if not client:
             return jsonify({"error": "OpenAI API key not configured"}), 500
             
@@ -444,11 +620,15 @@ def predict_outcome():
         return jsonify({"prediction": prediction})
     
     except Exception as e:
+        app.logger.error(f"Prediction error: {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/compliance-check', methods=['POST'])
+@limiter.limit("10 per hour")
 def compliance_check():
     try:
+        track_api_usage('/compliance-check')
+        
         if not client:
             return jsonify({"error": "OpenAI API key not configured"}), 500
             
@@ -485,11 +665,15 @@ def compliance_check():
         return jsonify({"compliance_report": compliance_report})
     
     except Exception as e:
+        app.logger.error(f"Compliance check error: {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/due-diligence', methods=['POST'])
+@limiter.limit("10 per hour")
 def due_diligence():
     try:
+        track_api_usage('/due-diligence')
+        
         if not client:
             return jsonify({"error": "OpenAI API key not configured"}), 500
             
@@ -527,11 +711,15 @@ def due_diligence():
         return jsonify({"diligence_report": diligence_report})
     
     except Exception as e:
+        app.logger.error(f"Due diligence error: {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/deposition-prep', methods=['POST'])
+@limiter.limit("10 per hour")
 def deposition_prep():
     try:
+        track_api_usage('/deposition-prep')
+        
         if not client:
             return jsonify({"error": "OpenAI API key not configured"}), 500
             
@@ -570,6 +758,7 @@ def deposition_prep():
         return jsonify({"deposition_questions": deposition_questions})
     
     except Exception as e:
+        app.logger.error(f"Deposition prep error: {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/health', methods=['GET'])
@@ -582,14 +771,68 @@ def health_check():
         "openai_configured": bool(OPENAI_API_KEY)
     })
 
+@app.route('/sessions', methods=['GET'])
+def get_sessions():
+    try:
+        with db_connection() as conn:
+            cursor = conn.execute(
+                "SELECT id, created_at, updated_at FROM chat_sessions ORDER BY updated_at DESC"
+            )
+            sessions = cursor.fetchall()
+        
+        return jsonify({"sessions": [dict(session) for session in sessions]})
+    except Exception as e:
+        app.logger.error(f"Session retrieval error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/sessions/<session_id>', methods=['GET'])
+def get_session(session_id):
+    try:
+        with db_connection() as conn:
+            cursor = conn.execute(
+                "SELECT id, history, created_at, updated_at FROM chat_sessions WHERE id = ?",
+                (session_id,)
+            )
+            session = cursor.fetchone()
+            
+            if not session:
+                return jsonify({"error": "Session not found"}), 404
+            
+            cursor = conn.execute(
+                "SELECT id, filename, file_type, created_at FROM uploaded_documents WHERE session_id = ? ORDER BY created_at DESC",
+                (session_id,)
+            )
+            documents = cursor.fetchall()
+        
+        return jsonify({
+            "session": dict(session),
+            "documents": [dict(doc) for doc in documents]
+        })
+    except Exception as e:
+        app.logger.error(f"Session retrieval error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/sessions/<session_id>', methods=['DELETE'])
+def delete_session(session_id):
+    try:
+        with db_connection() as conn:
+            conn.execute("DELETE FROM chat_sessions WHERE id = ?", (session_id,))
+            conn.execute("DELETE FROM uploaded_documents WHERE session_id = ?", (session_id,))
+            conn.commit()
+        
+        return jsonify({"status": "success", "message": "Session deleted successfully"})
+    except Exception as e:
+        app.logger.error(f"Session deletion error: {e}")
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == "__main__":
     # Pre-load some training data
     preload_training_data()
     
     app.config["START_TIME"] = time.time()
-    print("JustiBot AI Legal Assistant starting...")
-    print(f"OpenAI API Key: {'Loaded' if OPENAI_API_KEY else 'Missing'}")
-    print(f"Loaded {len(legal_db.cases)} legal cases")
-    print(f"Pre-loaded {len(legal_db.training_data)} training examples")
+    app.logger.info("JustiBot AI Legal Assistant starting...")
+    app.logger.info(f"OpenAI API Key: {'Loaded' if OPENAI_API_KEY else 'Missing'}")
+    app.logger.info(f"Loaded {len(legal_db.cases)} legal cases")
+    app.logger.info(f"Pre-loaded {len(legal_db.training_data)} training examples")
     
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 8080)), debug=True)
