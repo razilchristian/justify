@@ -1,0 +1,1048 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>JustiBot — Advanced AI Legal Assistant with Open AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    :root{
+      --bg:#f7fbff;
+      --surface:#ffffff;
+      --primary:#2b86ff;
+      --primary-600:#1f6fe0;
+      --accent:#3ecf8e;
+      --text:#0f1b2d;
+      --muted:#5b6b80;
+      --shadow:0 10px 30px rgba(21,61,120,.12);
+      --purple:#8c68cd;
+      --orange:#ff9f43;
+      --red:#ff6b6b;
+      --light-blue: #e9f5ff;
+      --light-green: #ecfff6;
+      --light-purple: #f1ebff;
+      --light-orange: #fff4e6;
+    }
+
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0}
+    html{scroll-behavior:smooth}
+
+    body{
+      font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+      color:var(--text);
+      background:
+        radial-gradient(1200px 600px at 80% -10%, rgba(43,134,255,.08), transparent 60%),
+        radial-gradient(900px 500px at -10% 20%, rgba(62,207,142,.10), transparent 60%),
+        var(--bg);
+      line-height:1.6;
+    }
+ .brand-logo {
+  height: 10%; /* Reduced from 110px to better fit navigation */
+  width: 20%;
+  display: block;
+  object-fit: contain;
+}
+
+/* Fallback if logo doesn't load */
+.logo-placeholder {
+  width: 100px; /* Increased from 34px to match logo size */
+  height: 100px; /* Increased from 34px to match logo size */
+  background: linear-gradient(135deg, var(--primary), #6db2ff);
+  border-radius: 10px;
+  display: none; /* Hidden by default */
+  place-items: center;
+  color: #fff;
+  font-weight: 900;
+  box-shadow: 0 6px 18px rgba(43,134,255,.35);
+  font-size: 18px; /* Slightly larger text for better proportion */
+}
+    .nav{
+      position:sticky;top:0;z-index:50;
+      background:rgba(255,255,255,.7);
+      backdrop-filter: blur(12px);
+      border-bottom:1px solid rgba(15,27,45,.06);
+    }
+    .nav .wrap{
+      max-width:1160px;max-height:100px;margin:0 auto;padding:0px 0px;
+      display:flex;align-items:center;justify-content:space-between;
+    }
+    .brand{display:flex;gap:10px;align-items:center;font-weight:700;color:var(--text)}
+    .brand-badge{
+      width:34px;height:34px;border-radius:10px;
+      background:linear-gradient(135deg,var(--primary),#7fb6ff);
+      display:grid;place-items:center;color:#fff;font-size:18px;
+      box-shadow:0 6px 18px rgba(43,134,255,.35);
+    }
+    .links{display:flex;gap:18px;align-items:center}
+    .links a{color:var(--muted);text-decoration:none;font-weight:600;font-size:14px}
+    .btn{
+      padding:10px 16px;border-radius:10px;border:1px solid transparent;
+      font-weight:700;font-size:14px;text-decoration:none;display:inline-flex;align-items:center;gap:8px;
+      cursor:pointer;transition:.2s;
+    }
+    .btn-primary{background:var(--primary);color:#fff;box-shadow:0 8px 18px rgba(43,134,255,.35)}
+    .btn-primary:hover{background:var(--primary-600)}
+    .btn-ghost{background:transparent;color:var(--primary);border-color:rgba(43,134,255,.25)}
+    .btn-ghost:hover{background:rgba(43,134,255,.06)}
+    .btn-purple{background:var(--purple);color:#fff;box-shadow:0 8px 18px rgba(140,104,205,.35)}
+    .btn-purple:hover{background:#7b58b8}
+    .btn-orange{background:var(--orange);color:#fff;box-shadow:0 8px 18px rgba(255,159,67,.35)}
+    .btn-orange:hover{background:#e68a39}
+
+    .hero{
+      max-width:1160px;margin:0 auto;padding:60px 20px 40px;
+      display:grid;grid-template-columns:1.1fr .9fr;gap:28px;align-items:center;
+    }
+    .pill{
+      display:inline-flex;gap:8px;align-items:center;padding:8px 12px;border-radius:999px;
+      background:#e9f5ff;border:1px solid rgba(43,134,255,.25);color:#1764d6;font-weight:700;font-size:12px;
+    }
+    .pill.purple{background:#f1ebff;border-color:rgba(140,104,205,.35);color:#6345a5}
+    .pill.orange{background:#fff4e6;border-color:rgba(255,159,67,.35);color:#cc7e35}
+    .pill.green{background:#ecfff6;border-color:rgba(62,207,142,.35);color:#0e7a4f}
+    .h1{font-size:42px;line-height:1.15;margin:14px 0 10px;letter-spacing:-.02em}
+    .h1 span{color:var(--primary)}
+    .lead{color:var(--muted);font-size:16px;margin:0 0 22px}
+    .cta-row{display:flex;gap:12px;flex-wrap:wrap}
+
+    .trust{display:flex;gap:18px;align-items:center;margin-top:26px;color:var(--muted);font-size:14px}
+    .trust .badge{
+      display:inline-flex;gap:6px;align-items:center;padding:6px 10px;border-radius:999px;
+      background:#ecfff6;border:1px solid rgba(62,207,142,.35);color:#0e7a4f;font-weight:700;font-size:12px;
+    }
+
+    .hero-card{
+      position:relative;border-radius:24px;background:linear-gradient(180deg,#ffffff,#f2f8ff);
+      box-shadow:var(--shadow);overflow:hidden;border:1px solid rgba(15,27,45,.06);
+      min-height:520px;display:grid;grid-template-rows:auto 1fr;
+    }
+    .hero-top{
+      padding:18px;border-bottom:1px solid rgba(15,27,45,.06);
+      display:flex;gap:10px;align-items:center;justify-content:space-between;background:linear-gradient(180deg,#f7fbff,#ffffff);
+    }
+    .tabs{display:flex;gap:10px;flex-wrap:wrap;}
+    .tab{padding:8px 12px;border-radius:10px;border:1px solid rgba(15,27,45,.08);background:#fff;font-weight:700;font-size:12px;color:var(--muted);cursor:pointer}
+    .tab.active{background:#e9f5ff;border-color:rgba(43,134,255,.35);color:#0b4aa8}
+
+    .screen{
+      position:relative;display:grid;grid-template-columns:1fr;place-items:center;padding:16px;height:100%;
+      background:
+        radial-gradient(400px 200px at 85% 10%, rgba(62,207,142,.15), transparent 60%),
+        radial-gradient(500px 200px at 20% 85%, rgba(43,134,255,.18), transparent 60%),
+        linear-gradient(180deg,#ffffff,#f6fbff);
+    }
+    .bot-card{
+      width:92%;max-width:540px;background:var(--surface);border-radius:20px;border:1px solid rgba(15,27,45,.08);
+      box-shadow:var(--shadow);display:grid;grid-template-rows:auto 1fr auto;overflow:hidden;height:100%;
+    }
+    .bot-header{
+      padding:14px 16px;background:linear-gradient(180deg,#eef6ff,#ffffff);border-bottom:1px solid rgba(15,27,45,.06);
+      display:flex;align-items:center;gap:10px;
+    }
+    .bot-avatar{
+      width:36px;height:36px;border-radius:10px;display:grid;place-items:center;color:#fff;font-weight:900;
+      background:linear-gradient(135deg,var(--primary),#6db2ff);box-shadow:0 4px 12px rgba(43,134,255,.25);
+    }
+    .bot-info{flex:1}
+    .bot-name{font-weight:700;font-size:14px;margin:0}
+    .bot-status{font-size:12px;color:var(--muted);margin:2px 0 0}
+    .bot-status.online{color:#0e7a4f}
+    .bot-actions{display:flex;gap:8px}
+    .bot-action{
+      width:28px;height:28px;border-radius:8px;display:grid;place-items:center;
+      background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:14px;
+    }
+    .bot-action:hover{background:rgba(15,27,45,.06);color:var(--text)}
+    
+    .chat-container{
+      padding:16px;display:flex;flex-direction:column;gap:12px;
+      background:repeating-linear-gradient(90deg,#fff,#fff 10px,#fcfeff 10px,#fcfeff 20px);
+      max-height:320px;overflow-y:auto;scroll-behavior:smooth;
+    }
+    .chat-container::-webkit-scrollbar {
+      width: 6px;
+    }
+    .chat-container::-webkit-scrollbar-track {
+      background: rgba(15,27,45,.04);
+      border-radius: 10px;
+    }
+    .chat-container::-webkit-scrollbar-thumb {
+      background: rgba(15,27,45,.15);
+      border-radius: 10px;
+    }
+    .chat-container::-webkit-scrollbar-thumb:hover {
+      background: rgba(15,27,45,.25);
+    }
+    
+    .bubble{
+      max-width:85%;padding:12px 16px;border-radius:16px;border:1px solid rgba(15,27,45,.06);font-size:14px;
+      background:#ffffff;color:var(--text);box-shadow:0 4px 12px rgba(15,27,45,.06);position:relative;
+      animation: fadeIn 0.3s ease;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .bubble.me{
+      margin-left:auto;background:var(--light-blue);border-color:rgba(43,134,255,.25);
+      border-bottom-right-radius:6px;
+    }
+    .bubble.bot{
+      background:var(--light-green);border-color:rgba(62,207,142,.35);
+      border-bottom-left-radius:6px;
+    }
+    .bubble.system{
+      background:var(--light-purple);border-color:rgba(140,104,205,.25);
+      margin:0 auto;text-align:center;font-size:13px;
+    }
+    .bubble.grok{
+      background:var(--light-orange);border-color:rgba(255,159,67,.25);
+      border-bottom-left-radius:6px;
+    }
+    .bubble-time{
+      font-size:10px;color:var(--muted);text-align:right;margin-top:4px;
+    }
+    .bubble-typing{
+      display:flex;gap:4px;align-items:center;padding:12px 16px;background:var(--light-green);
+      border:1px solid rgba(62,207,142,.35);border-radius:16px;width:fit-content;margin-bottom:8px;
+      border-bottom-left-radius:6px;
+    }
+    .bubble-typing span{
+      width:6px;height:6px;border-radius:50%;background:var(--accent);opacity:0.6;
+      animation: typing 1s infinite ease-in-out;
+    }
+    .bubble-typing span:nth-child(2){animation-delay:0.2s}
+    .bubble-typing span:nth-child(3){animation-delay:0.4s}
+    @keyframes typing {
+      0%, 100% { transform: translateY(0); opacity:0.6; }
+      50% { transform: translateY(-4px); opacity:1; }
+    }
+    
+    .input-container{
+      padding:16px;border-top:1px solid rgba(15,27,45,.06);background:#fff;
+    }
+    .input-row{
+      display:flex;gap:10px;border:1px solid rgba(15,27,45,.08);border-radius:12px;padding:8px;background:#fff;
+      position:relative;align-items:center;
+    }
+    .input-row:focus-within{
+      border-color:var(--primary);box-shadow:0 0 0 2px rgba(43,134,255,.15);
+    }
+    .input-row input{
+      border:none;outline:none;flex:1;font-size:14px;padding:8px 6px;background:transparent;color:var(--text)
+    }
+    .input-actions{
+      display:flex;gap:6px;align-items:center;
+    }
+    .input-action{
+      background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:6px;
+      border-radius:8px;display:grid;place-items:center;
+    }
+    .input-action:hover{background:rgba(15,27,45,.06);color:var(--text)}
+    .input-action.primary{
+      background:var(--primary);color:#fff;box-shadow:0 4px 12px rgba(43,134,255,.35);
+      padding:8px 12px;border-radius:10px;
+    }
+    .input-action.primary:hover{background:var(--primary-600)}
+    
+    .api-toggle{
+      display:flex;gap:8px;align-items:center;font-size:12px;color:var(--muted);margin-bottom:10px;
+      justify-content:flex-end;
+    }
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 40px;
+      height: 20px;
+    }
+    .toggle-switch input { 
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #ccc;
+      transition: .4s;
+      border-radius: 34px;
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 16px;
+      width: 16px;
+      left: 2px;
+      bottom: 2px;
+      background-color: white;
+      transition: .4s;
+      border-radius: 50%;
+    }
+    input:checked + .slider {
+      background-color: var(--orange);
+    }
+    input:checked + .slider:before {
+      transform: translateX(20px);
+    }
+    
+    .quick-replies{
+      display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;
+    }
+    .quick-reply{
+      padding:6px 12px;background:rgba(15,27,45,.04);border-radius:16px;font-size:12px;
+      color:var(--muted);cursor:pointer;transition:all 0.2s;
+    }
+    .quick-reply:hover{
+      background:var(--primary);color:#fff;
+    }
+
+    .section{max-width:1160px;margin:40px auto;padding:0 20px}
+    .kicker{color:#1764d6;background:#e9f5ff;border:1px solid rgba(43,134,255,.25);display:inline-block;padding:6px 10px;border-radius:999px;font-weight:700;font-size:12px}
+    .h2{font-size:32px;margin:14px 0 10px}
+    .muted{color:var(--muted)}
+    .grid{margin-top:22px;display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+    .card{background:var(--surface);border:1px solid rgba(15,27,45,.08);border-radius:16px;padding:18px;box-shadow:var(--shadow);transition:transform .2s ease}
+    .icon{
+      width:38px;height:38px;border-radius:10px;display:grid;place-items:center;color:#fff;font-weight:900;
+      background:linear-gradient(135deg,var(--primary),#6db2ff);box-shadow:0 8px 18px rgba(43,134,255,.35);margin-bottom:10px
+    }
+    .icon.green{background:linear-gradient(135deg,var(--accent),#7be9b2);box-shadow:0 8px 18px rgba(62,207,142,.35)}
+    .icon.purple{background:linear-gradient(135deg,var(--purple),#a992e0);box-shadow:0 8px 18px rgba(140,104,205,.35)}
+    .icon.orange{background:linear-gradient(135deg,var(--orange),#ffbe85);box-shadow:0 8px 18px rgba(255,159,67,.35)}
+    .icon.red{background:linear-gradient(135deg,var(--red),#ff9e9e);box-shadow:0 8px 18px rgba(255,107,107,.35)}
+    .card h3{margin:8px 0 6px;font-size:18px}
+    .card p{margin:0;color:var(--muted);font-size:14px}
+
+    .feature-grid{margin-top:32px;display:grid;grid-template-columns:repeat(2,1fr);gap:20px}
+    .feature-card{
+      background:var(--surface);border-radius:16px;padding:22px;border:1px solid rgba(15,27,45,.08);
+      box-shadow:var(--shadow);display:flex;gap:16px;align-items:flex-start;
+    }
+    .feature-icon{
+      width:44px;height:44px;border-radius:12px;display:grid;place-items:center;color:#fff;font-weight:900;flex-shrink:0;
+      background:linear-gradient(135deg,var(--primary),#6db2ff);box-shadow:0 8px 18px rgba(43,134,255,.35);
+    }
+    .feature-icon.purple{background:linear-gradient(135deg,var(--purple),#a992e0)}
+    .feature-icon.orange{background:linear-gradient(135deg,var(--orange),#ffbe85)}
+    .feature-content h3{margin:0 0 8px;font-size:18px}
+    .feature-content p{margin:0;color:var(--muted);font-size:14px}
+
+    .cta{
+      margin:50px auto 70px;max-width:1160px;padding:22px;border:1px solid rgba(15,27,45,.08);
+      border-radius:20px;background:linear-gradient(180deg,#eef7ff,#ffffff);
+      display:flex;align-items:center;justify-content:space-between;gap:16px;box-shadow:var(--shadow)
+    }
+    .cta strong{font-size:20px}
+    .cta .btn{font-size:15px}
+
+    footer{padding:26px 20px;border-top:1px solid rgba(15,27,45,.08);background:#ffffff7a;backdrop-filter: blur(6px)}
+    .foot{max-width:1160px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;color:var(--muted);font-size:14px}
+    .mini{display:flex;gap:12px}
+    .mini a{color:var(--muted);text-decoration:none}
+
+    .modal{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,27,45,.7);display:grid;place-items:center;z-index:100;padding:20px;opacity:0;pointer-events:none;transition:opacity .3s ease}
+    .modal.active{opacity:1;pointer-events:all}
+    .modal-content{background:var(--surface);border-radius:20px;padding:28px;max-width:500px;width:100%;box-shadow:var(--shadow);transform:translateY(20px);transition:transform .3s ease}
+    .modal.active .modal-content{transform:translateY(0)}
+    .modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+    .modal-header h3{margin:0;font-size:20px}
+    .modal-close{background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted)}
+    .modal-body{margin-bottom:22px}
+    .modal-input{width:100%;padding:12px;border:1px solid rgba(15,27,45,.12);border-radius:10px;margin-bottom:16px;font-size:14px}
+    .modal-footer{display:flex;gap:10px;justify-content:flex-end}
+
+    @media (prefers-reduced-motion: no-preference){
+      .reveal{
+        opacity:0;
+        transform: translateY(22px) scale(.98);
+        transition: opacity .6s ease, transform .6s ease;
+        will-change: opacity, transform;
+      }
+      .reveal.show{
+        opacity:1;
+        transform: translateY(0) scale(1);
+      }
+      .reveal-delay-1{transition-delay:.08s}
+      .reveal-delay-2{transition-delay:.16s}
+      .reveal-delay-3{transition-delay:.24s}
+      .reveal-left{transform: translateX(-22px); }
+      .reveal-left.show{transform: translateX(0)}
+      .reveal-right{transform: translateX(22px); }
+      .reveal-right.show{transform: translateX(0)}
+      .card:hover{transform:translateY(-3px);transition:transform .18s ease}
+      .feature-card:hover{transform:translateY(-3px);transition:transform .18s ease}
+    }
+
+    @media (max-width: 900px) {
+      .hero{grid-template-columns:1fr}
+      .grid{grid-template-columns:repeat(2,1fr)}
+      .feature-grid{grid-template-columns:1fr}
+      .nav .wrap{flex-wrap:wrap;gap:12px}
+      .links{margin-left:auto}
+      .chat-container{max-height:280px}
+    }
+    @media (max-width: 600px) {
+      .grid{grid-template-columns:1fr}
+      .h1{font-size:32px}
+      .cta{flex-direction:column;text-align:center}
+      .trust{flex-direction:column;align-items:flex-start;gap:10px}
+      .tabs{flex-wrap: wrap;}
+      .api-toggle{justify-content:flex-start;margin-top:10px}
+      .bot-card{height:420px}
+      .chat-container{max-height:240px}
+      .bubble{max-width:90%}
+    }
+  </style>
+</head>
+<body>
+  <!-- Nav -->
+ <header class="nav">
+  <div class="wrap">
+    <div class="brand reveal reveal-left">
+      <img src="/logo.png" alt="JustiBot Logo" class="brand-logo">
+      <div>JustiBot</div>
+    </div>
+    <nav class="links">
+      <a href="#features">Features</a>
+      <a href="#advanced">Advanced</a>
+      <a href="#how">How it works</a>
+      <a class="btn btn-ghost" href="#demo">Demo</a>
+      <a class="btn btn-primary" href="#get-started">Get Started</a>
+    </nav>
+  </div>
+</header>
+
+  <!-- Hero -->
+  <section class="hero" id="home">
+    <div class="reveal">
+      <div class="pill">India‑ready AI for legal work</div>
+      <h1 class="h1">Welcome To <span>Next-Generation</span> AI Legal Assistant</h1>
+      <p class="lead">Multi-document analysis, predictive analytics, and now powered by Open AI for comprehensive legal assistance.</p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="#get-started">Start Free</a>
+        <a class="btn btn-orange" href="#demo">Try Open AI</a>
+        <a class="btn btn-ghost" href="#how">Watch Demo</a>
+      </div>
+      <div class="trust reveal reveal-delay-1">
+        <div class="badge">✔ No coding required</div>
+        <div>Private by design • Enterprise-grade security • API access</div>
+      </div>
+    </div>
+
+    <div class="hero-card reveal reveal-right" id="demo">
+      <div class="hero-top">
+        <div class="tabs">
+          <div class="tab active" data-tab="chat">Chat</div>
+          <div class="tab" data-tab="draft">Draft</div>
+          <div class="tab" data-tab="judgment">Judgments</div>
+          <div class="tab" data-tab="advanced">Advanced</div>
+          <div class="tab" data-tab="grok">open AI</div>
+        </div>
+        <div class="pill" style="background:#ecfff6;border-color:rgba(62,207,142,.35);color:#0e7a4f">Live Preview</div>
+      </div>
+      <div class="screen">
+        <div class="bot-card">
+          <div class="bot-header">
+            <div class="bot-avatar">J</div>
+            <div class="bot-info">
+              <h3 class="bot-name">JustiBot</h3>
+              <p class="bot-status online">Online • Ready to help</p>
+            </div>
+            <div class="bot-actions">
+              <button class="bot-action" title="Clear chat"><i class="fas fa-broom"></i></button>
+              <button class="bot-action" title="Settings"><i class="fas fa-cog"></i></button>
+            </div>
+          </div>
+          
+          <div class="chat-container" id="chatArea">
+            <!-- Chat messages will be added here -->
+          </div>
+          
+          <div class="input-container">
+            <div class="api-toggle">
+              <span>Use Open AI</span>
+              <label class="toggle-switch">
+                <input type="checkbox" id="grokToggle">
+                <span class="slider"></span>
+              </label>
+            </div>
+            
+            <div class="input-row">
+              <input id="prompt" placeholder="Ask a legal question or upload documents..." />
+              <div class="input-actions">
+                <button class="input-action" id="uploadBtn" title="Upload document"><i class="fas fa-paperclip"></i></button>
+                <button class="input-action primary" id="sendBtn"><i class="fas fa-paper-plane"></i></button>
+              </div>
+            </div>
+            
+            <div class="quick-replies" id="quickReplies">
+              <div class="quick-reply">Case law search</div>
+              <div class="quick-reply">Contract review</div>
+              <div class="quick-reply">Legal definitions</div>
+              <div class="quick-reply">Document analysis</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section class="section" id="features">
+    <span class="kicker reveal">Core Features</span>
+    <h2 class="h2 reveal reveal-delay-1">Everything for faster legal work</h2>
+    <p class="muted reveal reveal-delay-2">Focus on strategy while the assistant drafts, searches, and summarizes with reliable, editable outputs.</p>
+
+    <div class="grid">
+      <div class="card reveal">
+        <div class="icon">A</div>
+        <h3>AI Drafting</h3>
+        <p>Create petitions, contracts, notices, and more with editable templates and citations.</p>
+      </div>
+      <div class="card reveal reveal-delay-1">
+        <div class="icon green">J</div>
+        <h3>Judgment Finder</h3>
+        <p>Retrieve relevant case laws with quick highlights and source references.</p>
+      </div>
+      <div class="card reveal reveal-delay-2">
+        <div class="icon">Q</div>
+        <h3>Scenario Solver</h3>
+        <p>Ask complex fact patterns and get structured issue spotting and reasoning.</p>
+      </div>
+      <div class="card reveal">
+        <div class="icon green">S</div>
+        <h3>Secure Workspace</h3>
+        <p>Private by default with exportable drafts and notes for each matter.</p>
+      </div>
+      <div class="card reveal reveal-delay-1">
+        <div class="icon orange">G</div>
+        <h3>Open AI Integration</h3>
+        <p>Access advanced AI capabilities for complex legal reasoning and analysis.</p>
+      </div>
+      <div class="card reveal reveal-delay-2">
+        <div class="icon green">⚡</div>
+        <h3>One‑click Exports</h3>
+        <p>Download to DOCX or PDF, or copy formatted text into filings and emails.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Advanced Features -->
+  <section class="section" id="advanced">
+    <span class="kicker reveal">Advanced Capabilities</span>
+    <h2 class="h2 reveal reveal-delay-1">Features beyond standard legal AI</h2>
+    <p class="muted reveal reveal-delay-2">LexiAssist offers enterprise-grade tools not found in other legal AI platforms.</p>
+
+    <div class="feature-grid">
+      <div class="feature-card reveal">
+        <div class="feature-icon purple">M</div>
+        <div class="feature-content">
+          <h3>Multi-Document Analysis</h3>
+          <p>Upload multiple contracts, briefs, or evidence files and get cross-document insights, contradictions, and patterns.</p>
+        </div>
+      </div>
+      <div class="feature-card reveal reveal-delay-1">
+        <div class="feature-icon">P</div>
+        <div class="feature-content">
+          <h3>Predictive Analytics</h3>
+          <p>Case outcome predictions based on similar historical cases, judge tendencies, and legal strategy analysis.</p>
+        </div>
+      </div>
+      <div class="feature-card reveal reveal-delay-2">
+        <div class="feature-icon purple">C</div>
+        <div class="feature-content">
+          <h3>Contract Lifecycle Management</h3>
+          <p>Track contract milestones, auto-identify renewal dates, and flag non-standard clauses across your document repository.</p>
+        </div>
+      </div>
+      <div class="feature-card reveal reveal-delay-3">
+        <div class="feature-icon orange">G</div>
+        <div class="feature-content">
+          <h3>Open AI Enhanced Analysis</h3>
+          <p>Leverage Grok's powerful AI for deeper legal reasoning, hypothetical scenario testing, and comprehensive explanations.</p>
+        </div>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon orange">T</div>
+        <div class="feature-content">
+          <h3>Template Intelligence</h3>
+          <p>AI that learns from your successful documents to create firm-specific templates with your preferred language.</p>
+        </div>
+      </div>
+      <div class="feature-card reveal reveal-delay-1">
+        <div class="feature-icon">D</div>
+        <div class="feature-content">
+          <h3>Deposition Preparation</h3>
+          <p>Generate potential questions, identify weaknesses in witness statements, and prepare examination strategies.</p>
+        </div>
+      </div>
+      <div class="feature-card reveal reveal-delay-2">
+        <div class="feature-icon orange">R</div>
+        <div class="feature-content">
+          <h3>Regulatory Compliance Mapping</h3>
+          <p>Automatically map your policies and procedures to relevant regulations and identify compliance gaps.</p>
+        </div>
+      </div>
+      <div class="feature-card reveal reveal-delay-3">
+        <div class="feature-icon">E</div>
+        <div class="feature-content">
+          <h3>Due Diligence Accelerator</h3>
+          <p>Rapidly analyze large volumes of documents in M&A transactions with AI-powered issue spotting and risk scoring.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- How it works -->
+  <section class="section" id="how">
+    <span class="kicker reveal">Three simple steps</span>
+    <h2 class="h2 reveal reveal-delay-1">From question to draft</h2>
+    <p class="muted reveal reveal-delay-2">Open the chat, describe what is needed, then refine with follow‑ups and export the final draft.</p>
+    <div class="grid">
+      <div class="card reveal">
+        <div class="icon">1</div>
+        <h3>Ask</h3>
+        <p>State the facts and the goal. Include jurisdiction and desired format.</p>
+      </div>
+           <div class="card reveal reveal-delay-1">
+        <div class="icon green">2</div>
+        <h3>Refine</h3>
+        <p>Request citations, tone, or length adjustments until it's courtroom‑ready.</p>
+      </div>
+      <div class="card reveal reveal-delay-2">
+        <div class="icon orange">3</div>
+        <h3>Enhance with Open Ai</h3>
+        <p>Toggle JustiBot AI for advanced analysis, hypotheticals, and comprehensive explanations.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA strip -->
+  <section class="cta reveal" id="get-started">
+    <div>
+      <div class="pill">Get started free</div>
+      <strong>Build stronger arguments faster with an AI‑ready toolkit.</strong>
+    </div>
+    <div>
+      <a class="btn btn-primary" href="#demo">Open Demo</a>
+      <a class="btn btn-orange" href="#" id="enterpriseBtn">Enterprise Trial</a>
+      <a class="btn btn-ghost" href="#how">See How</a>
+    </div>
+  </section>
+
+  <footer>
+    <div class="foot">
+      <div class="brand"><div class="brand-badge"></div>JustiBot</div>
+      <div class="mini">
+        <a href="#features">Features</a>
+        <a href="#advanced">Advanced</a>
+        <a href="#how">How it works</a>
+        <a href="#get-started">Get started</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Enterprise Modal -->
+  <div class="modal" id="enterpriseModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Enterprise Trial Request</h3>
+        <button class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="text" class="modal-input" placeholder="Full Name">
+        <input type="email" class="modal-input" placeholder="Work Email">
+        <input type="text" class="modal-input" placeholder="Organization">
+                <input type="text" class="modal-input" placeholder="Number of Users">
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost">Cancel</button>
+        <button class="btn btn-primary">Submit Request</button>
+      </div>
+    </div>
+  </div>
+<script>
+// =====================
+// Element references
+// =====================
+const tabs = document.querySelectorAll('.tab');
+const chatArea = document.getElementById('chatArea');
+const input = document.getElementById('prompt');
+const btn = document.getElementById('sendBtn');
+const uploadBtn = document.getElementById('uploadBtn');
+const grokToggle = document.getElementById('grokToggle');
+const quickReplies = document.getElementById('quickReplies');
+
+// Add an OpenAI toggle next to Grok (if not present)
+(function ensureOpenAIToggle() {
+  const apiToggle = document.querySelector('.api-toggle');
+  if (!apiToggle) return;
+  if (!document.getElementById('openAIToggle')) {
+    const wrap = document.createElement('div');
+    wrap.style.display = 'flex';
+    wrap.style.gap = '8px';
+    wrap.style.alignItems = 'center';
+    wrap.style.fontSize = '12px';
+    wrap.style.color = 'var(--muted)';
+    wrap.innerHTML = '<span>Use OpenAI</span> <label class="toggle-switch"> <input type="checkbox" id="openAIToggle" checked> <span class="slider"></span> </label>';
+    apiToggle.prepend(wrap);
+  }
+})();
+
+const openAIToggle = document.getElementById('openAIToggle');
+
+// Maintain simple conversation history for OpenAI context
+const chatHistory = []; // array of {role:'user'|'assistant', content:''}
+
+// Global flags
+let useStreaming = false; // set true to use SSE streaming from /openai/chat-stream
+
+// =====================
+// Tabs behavior (no hardcoded demo text)
+// =====================
+tabs.forEach(t => t.addEventListener('click', () => {
+  tabs.forEach(x => x.classList.remove('active'));
+  t.classList.add('active');
+  input.focus();
+  const tabName = t.getAttribute('data-tab');
+  
+  // Keep UX feedback minimal and neutral
+  if (tabName === 'advanced') {
+    appendBubble('Advanced features panel open.', 'bot', true);
+  } else if (tabName === 'grok') {
+    appendBubble('Grok AI panel open.', 'bot', true);
+    if (grokToggle) grokToggle.checked = true;
+  } else if (tabName === 'chat') {
+    appendBubble('Standard chat panel open.', 'bot', true);
+    if (grokToggle) grokToggle.checked = false;
+  }
+}));
+
+// =====================
+// Reveal animations
+// =====================
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('show');
+      observer.unobserve(entry.target);
+    }
+  });
+}, { threshold: 0.12 });
+
+document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+// =====================
+// Chat bubble helpers
+// =====================
+function appendBubble(text, who = 'me', isSystem = false, isGrok = false) {
+  const b = document.createElement('div');
+  if (isGrok) {
+    b.className = 'bubble grok';
+    const formattedText = (text || '').replace(/\n/g, '<br>');
+    b.innerHTML = '<strong>Grok AI:</strong><div style="margin-top: 5px;">' + formattedText + '</div>';
+  } else if (isSystem) {
+    b.className = 'bubble system';
+    b.textContent = text || '';
+  } else {
+    b.className = 'bubble ' + (who === 'me' ? 'me' : 'bot');
+    if (who === 'bot') {
+      const formattedText = (text || '').replace(/\n/g, '<br>');
+      b.innerHTML = formattedText;
+    } else {
+      b.textContent = text || '';
+    }
+  }
+  
+  const time = document.createElement('div');
+  time.className = 'bubble-time';
+  time.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  b.appendChild(time);
+  
+  chatArea.appendChild(b);
+  chatArea.scrollTop = chatArea.scrollHeight;
+  return b; // return bubble element (useful for streaming updates)
+}
+
+function showTypingIndicator() {
+  const typing = document.createElement('div');
+  typing.className = 'bubble-typing';
+  typing.id = 'typingIndicator';
+  typing.innerHTML = '<span></span><span></span><span></span>';
+  chatArea.appendChild(typing);
+  chatArea.scrollTop = chatArea.scrollHeight;
+}
+
+function hideTypingIndicator() {
+  const typing = document.getElementById('typingIndicator');
+  if (typing) typing.remove();
+}
+
+// =====================
+// API callers
+// =====================
+async function callGrokAPI(text) {
+  const res = await fetch('/grok-chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: text })
+  });
+  if (!res.ok) throw new Error('Grok API error');
+  return res.json();
+}
+
+async function callOpenAI(text, { history = chatHistory, stream = useStreaming } = {}) {
+  if (!stream) {
+    const res = await fetch('/openai/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: text,
+        history,
+        model: 'gpt-4o-mini',
+        temperature: 0.2,
+        max_tokens: 900
+      })
+    });
+    if (!res.ok) throw new Error('OpenAI chat error');
+    return res.json(); // {response}
+  }
+  
+  // Streaming via SSE with fetch ReadableStream
+  const res = await fetch('/openai/chat-stream', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      message: text,
+      history,
+      model: 'gpt-4o-mini',
+      temperature: 0.2,
+      max_tokens: 900
+    })
+  });
+  
+  if (!res.ok || !res.body) {
+    throw new Error('OpenAI stream error');
+  }
+  
+  // Prepare a bot bubble to progressively fill
+  const streamBubble = appendBubble('', 'bot');
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder('utf-8');
+  let acc = '';
+  
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    
+    const chunk = decoder.decode(value, { stream: true });
+    // SSE: lines prefixed with "data:"
+    const lines = chunk.split('\n');
+    
+    for (const line of lines) {
+      if (!line.startsWith('data:')) continue;
+      const payload = line.slice(5).trim();
+      if (!payload) continue;
+      if (payload === '[DONE]') break;
+      if (payload.startsWith('[ERROR]')) {
+        streamBubble.innerHTML = 'Error: ' + payload.replace('[ERROR]', '').trim();
+        return { response: streamBubble.textContent || 'Error' };
+      }
+      
+      acc += payload;
+      streamBubble.innerHTML = (acc || '').replace(/\n/g, '<br>') + streamBubble.querySelector('.bubble-time').outerHTML;
+    }
+  }
+  
+  // Return as if JSON shape to keep caller uniform
+  return { response: acc };
+}
+
+// =====================
+// Send message orchestrator
+// =====================
+async function sendMessage() {
+  const text = input.value.trim();
+  if (!text) return;
+  
+  appendBubble(text, 'me');
+  input.value = '';
+  
+  // Maintain history for OpenAI (user turn)
+  chatHistory.push({ role: 'user', content: text });
+  
+  const useGrok = grokToggle && grokToggle.checked;
+  const useOpenAI = openAIToggle ? openAIToggle.checked : true;
+  
+  showTypingIndicator();
+  
+  try {
+    let data;
+    if (useGrok && !useOpenAI) {
+      // Grok path
+      data = await callGrokAPI(text);
+      hideTypingIndicator();
+      if (data && data.response) {
+        appendBubble(data.response, 'bot', false, true);
+        chatHistory.push({ role: 'assistant', content: stripHTML(data.response) });
+      } else {
+        appendBubble('No response from Grok server', 'bot');
+      }
+    } else {
+      // OpenAI default path (non-stream or stream)
+      data = await callOpenAI(text, { history: chatHistory, stream: useStreaming });
+      hideTypingIndicator();
+      if (data && data.response) {
+        appendBubble(data.response, 'bot');
+        chatHistory.push({ role: 'assistant', content: stripHTML(data.response) });
+      } else {
+        appendBubble('No response from OpenAI server', 'bot');
+      }
+    }
+  } catch (err) {
+    hideTypingIndicator();
+    console.error('API error:', err);
+    appendBubble('Error contacting server. Please try again.', 'bot');
+  }
+}
+
+// Helper to strip HTML tags when storing assistant content
+function stripHTML(html) {
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html || '';
+  return tmp.textContent || tmp.innerText || '';
+}
+
+// =====================
+// Upload button logic
+// =====================
+if (uploadBtn) {
+  uploadBtn.addEventListener('click', () => {
+    const docText = prompt('Paste document text for analysis (max 5000 characters):');
+    if (docText && docText.trim()) {
+      appendBubble('Uploading document for analysis...', 'bot', true);
+      fetch('/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: docText })
+      })
+      .then(res => res.json())
+      .then(() => {
+        appendBubble('✅ Document uploaded. Ask to analyze or summarize it.', 'bot', true);
+      })
+      .catch(() => appendBubble('Upload failed. Please try again.', 'bot', true));
+    }
+  });
+}
+
+// =====================
+// Quick replies
+// =====================
+if (quickReplies) {
+  quickReplies.querySelectorAll('.quick-reply').forEach(reply => {
+    reply.addEventListener('click', () => {
+      input.value = reply.textContent;
+      sendMessage();
+    });
+  });
+}
+
+// =====================
+// Clear chat
+// =====================
+const clearChatBtn = document.querySelector('.bot-action[title="Clear chat"]');
+if (clearChatBtn) {
+  clearChatBtn.addEventListener('click', () => {
+    if (confirm('Clear all chat messages?')) {
+      chatArea.innerHTML = '';
+      chatHistory.length = 0;
+      appendInitialGreeting();
+    }
+  });
+}
+
+// =====================
+// Enterprise modal wiring (unchanged)
+// =====================
+const enterpriseModal = document.getElementById('enterpriseModal');
+const enterpriseBtn = document.getElementById('enterpriseBtn');
+const modalClose = document.querySelector('.modal-close');
+
+if (enterpriseBtn && enterpriseModal && modalClose) {
+  enterpriseBtn.addEventListener('click', e => {
+    e.preventDefault();
+    enterpriseModal.classList.add('active');
+  });
+  
+  modalClose.addEventListener('click', () => {
+    enterpriseModal.classList.remove('active');
+  });
+  
+  enterpriseModal.addEventListener('click', e => {
+    if (e.target === enterpriseModal) {
+      enterpriseModal.classList.remove('active');
+    }
+  });
+}
+
+// =====================
+// Input bindings
+// =====================
+input.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    sendMessage();
+  }
+});
+
+btn.addEventListener('click', sendMessage);
+
+// =====================
+// Toggles
+// =====================
+if (grokToggle) {
+  grokToggle.addEventListener('change', function () {
+    if (this.checked) {
+      appendBubble('Grok AI enabled.', 'bot', true);
+      if (openAIToggle) openAIToggle.checked = false; // optional mutual exclusion
+    } else {
+      appendBubble('Grok AI disabled.', 'bot', true);
+    }
+  });
+}
+
+if (openAIToggle) {
+  openAIToggle.addEventListener('change', function () {
+    if (this.checked) {
+      appendBubble('OpenAI enabled.', 'bot', true);
+      if (grokToggle) grokToggle.checked = false; // optional mutual exclusion
+    } else {
+      appendBubble('OpenAI disabled.', 'bot', true);
+    }
+  });
+}
+
+// =====================
+// Focus handling
+// =====================
+document.addEventListener('click', () => {
+  input && input.focus();
+});
+
+// =====================
+/* Initial greeting: keep neutral and non-hardcoded claims. */
+// =====================
+function appendInitialGreeting() {
+  appendBubble("Hello! How can I assist with your legal research or drafting today?", 'bot');
+}
+
+appendInitialGreeting();
+</script>
+</body>
+</html>

@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LegalConnect - Attorney Portal</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #1a2a6c, #2c3e50);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow-x: hidden;
+            padding: 20px;
+        }
+        
+        .container {
+            width: 100%;
+            max-width: 450px;
+            perspective: 1000px;
+        }
+        
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
+            padding: 30px;
+            transform-style: preserve-3d;
+            transition: transform 0.5s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, transparent, rgba(26, 42, 108, 0.1), transparent);
+            transform: rotate(45deg);
+            animation: shine 6s infinite;
+            z-index: 1;
+        }
+        
+        @keyframes shine {
+            0% { transform: translateX(-100%) rotate(45deg); }
+            100% { transform: translateX(100%) rotate(45deg); }
+        }
+        
+        .logo {
+            text-align: center;
+            margin-bottom: 25px;
+            transform: translateZ(30px);
+        }
+        
+        .logo h1 {
+            color: #1a2a6c;
+            font-size: 28px;
+            font-weight: 700;
+        }
+        
+        .logo p {
+            color: #7f8c8d;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+            position: relative;
+            transform-style: preserve-3d;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #2c3e50;
+            transform: translateZ(20px);
+        }
+        
+        input, select {
+            width: 100%;
+            padding: 15px 15px 15px 45px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: all 0.3s;
+            transform: translateZ(10px);
+            background: #f9f9f9;
+        }
+        
+        input:focus, select:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
+            transform: translateZ(15px) scale(1.01);
+        }
+        
+        .input-icon {
+            position: absolute;
+            left: 15px;
+            top: 38px;
+            color: #7f8c8d;
+            font-size: 18px;
+            transform: translateZ(25px);
+        }
+        
+        button {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(to right, #1a2a6c, #3498db);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+            transform: translateZ(20px);
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            box-shadow: 0 4px 15px rgba(26, 42, 108, 0.3);
+        }
+        
+        button:hover {
+            background: linear-gradient(to right, #3498db, #1a2a6c);
+            transform: translateZ(25px) scale(1.02);
+            box-shadow: 0 6px 20px rgba(26, 42, 108, 0.4);
+        }
+        
+        .toggle-form {
+            text-align: center;
+            margin-top: 20px;
+            color: #7f8c8d;
+            transform: translateZ(20px);
+        }
+        
+        .toggle-form a {
+            color: #3498db;
+            text-decoration: none;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+        
+        .toggle-form a:hover {
+            color: #1a2a6c;
+            text-decoration: underline;
+        }
+        
+        .form-section {
+            display: none;
+            animation: fadeIn 0.5s forwards;
+        }
+        
+        .active {
+            display: block;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .progress-bar {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+            position: relative;
+            transform: translateZ(30px);
+        }
+        
+        .progress-step {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: #e0e0e0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: #7f8c8d;
+            z-index: 2;
+            position: relative;
+        }
+        
+        .progress-step.active {
+            background: #3498db;
+            color: white;
+        }
+        
+        .progress-step.completed {
+            background: #2ecc71;
+            color: white;
+        }
+        
+        .progress-bar::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: #e0e0e0;
+            transform: translateY(-50%);
+            z-index: 1;
+        }
+        
+        .nav-buttons {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+        }
+        
+        .nav-btn {
+            padding: 12px 25px;
+            background: #95a5a6;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            transform: translateZ(15px);
+        }
+        
+        .nav-btn.next {
+            background: #3498db;
+        }
+        
+        .nav-btn.prev {
+            background: #7f8c8d;
+        }
+        
+        .nav-btn:hover {
+            transform: translateZ(20px) scale(1.05);
+        }
+        
+        .file-upload {
+            border: 2px dashed #3498db;
+            padding: 20px;
+            text-align: center;
+            border-radius: 8px;
+            margin-top: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            transform: translateZ(10px);
+        }
+        
+        .file-upload:hover {
+            background: rgba(52, 152, 219, 0.1);
+            transform: translateZ(15px);
+        }
+        
+        .file-upload i {
+            font-size: 24px;
+            color: #3498db;
+            margin-bottom: 10px;
+        }
+        
+        .specialization-checkboxes {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+        }
+        
+        .checkbox-group input {
+            width: auto;
+            margin-right: 10px;
+            transform: translateZ(5px);
+        }
+        
+        @media (max-width: 480px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .card {
+                padding: 20px;
+            }
+            
+            .specialization-checkboxes {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .legal-badge {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: #1a2a6c;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            font-weight: bold;
+            transform: translateZ(40px);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+        }
+        
+        .backend-console {
+            margin-top: 30px;
+            background: #2c3e50;
+            border-radius: 8px;
+            padding: 15px;
+            color: white;
+            font-family: monospace;
+            max-height: 200px;
+            overflow-y: auto;
+            transform: translateZ(10px);
+        }
+        
+        .console-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            color: #3498db;
+        }
+        
+        .console-log {
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        
+        .log-entry {
+            margin-bottom: 5px;
+            padding-left: 10px;
+            border-left: 3px solid #3498db;
+        }
+        
+        .log-success {
+            border-left-color: #2ecc71;
+            color: #2ecc71;
+        }
+        
+        .log-error {
+            border-left-color: #e74c3c;
+            color: #e74c3c;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <div class="legal-badge">LEGAL PORTAL</div>
+            
+            <div class="logo">
+                <h1>LegalConnect</h1>
+                <p>Portal for Legal Professionals</p>
+            </div>
+            
+            <div class="progress-bar">
+                <div class="progress-step completed">1</div>
+                <div class="progress-step completed">2</div>
+                <div class="progress-step active">3</div>
+                <div class="progress-step">4</div>
+            </div>
+            
+            <!-- Login Form -->
+            <div id="login-form" class="form-section active">
+                <h2 style="text-align: center; margin-bottom: 20px; color: #2c3e50; transform: translateZ(25px);">Login to Your Account</h2>
+                
+                <form id="login">
+                    <div class="form-group">
+                        <label for="login-email">Email Address</label>
+                        <i class="input-icon fas fa-envelope"></i>
+                        <input type="email" id="login-email" placeholder="Enter your email" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="login-password">Password</label>
+                        <i class="input-icon fas fa-lock"></i>
+                        <input type="password" id="login-password" placeholder="Enter your password" required minlength="8">
+                    </div>
+                    
+                    <button type="submit">Login</button>
+                </form>
+                
+                <div class="toggle-form">
+                    Don't have an account? <a id="show-signup">Register Now</a>
+                </div>
+            </div>
+            
+            <!-- Signup Form Step 1 -->
+            <div id="signup-step1" class="form-section">
+                <h2 style="text-align: center; margin-bottom: 20px; color: #2c3e50; transform: translateZ(25px);">Basic Information</h2>
+                
+                <form id="signup1">
+                    <div class="form-group">
+                        <label for="name">Full Name</label>
+                        <i class="input-icon fas fa-user"></i>
+                        <input type="text" id="name" placeholder="Enter your full name" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="signup-email">Email Address</label>
+                        <i class="input-icon fas fa-envelope"></i>
+                        <input type="email" id="signup-email" placeholder="Enter your email" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="signup-password">Password (min 8 characters)</label>
+                        <i class="input-icon fas fa-lock"></i>
+                        <input type="password" id="signup-password" placeholder="Create a password" required minlength="8">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="phone">Phone Number</label>
+                        <i class="input-icon fas fa-phone"></i>
+                        <input type="tel" id="phone" placeholder="Enter your phone number" required>
+                    </div>
+                    
+                    <div class="nav-buttons">
+                        <button type="button" class="nav-btn prev" id="to-login">Back to Login</button>
+                        <button type="button" class="nav-btn next" id="step1-next">Next</button>
+                    </div>
+                </form>
+            </div>
+            
+            <!-- Signup Form Step 2 -->
+            <div id="signup-step2" class="form-section">
+                <h2 style="text-align: center; margin-bottom: 20px; color: #2c3e50; transform: translateZ(25px);">Professional Details</h2>
+                
+                <form id="signup2">
+                    <div class="form-group">
+                        <label for="bar-number">Bar Council Registration Number</label>
+                        <i class="input-icon fas fa-id-card"></i>
+                        <input type="text" id="bar-number" placeholder="Enter your bar registration number" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="jurisdiction">Jurisdiction of Practice</label>
+                        <i class="input-icon fas fa-gavel"></i>
+                        <select id="jurisdiction" required>
+                            <option value="">Select your jurisdiction</option>
+                            <option value="federal">Federal</option>
+                            <option value="state">State</option>
+                            <option value="district">District</option>
+                            <option value="international">International</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Specialization Area(s)</label>
+                        <div class="specialization-checkboxes">
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="corporate-law" value="corporate">
+                                <label for="corporate-law">Corporate Law</label>
+                            </div>
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="criminal-law" value="criminal">
+                                <label for="criminal-law">Criminal Law</label>
+                            </div>
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="family-law" value="family">
+                                <label for="family-law">Family Law</label>
+                            </div>
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="ip-law" value="ip">
+                                <label for="ip-law">IP Law</label>
+                            </div>
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="tax-law" value="tax">
+                                <label for="tax-law">Tax Law</label>
+                            </div>
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="real-estate-law" value="real-estate">
+                                <label for="real-estate-law">Real Estate Law</label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="nav-buttons">
+                        <button type="button" class="nav-btn prev" id="step2-prev">Previous</button>
+                        <button type="button" class="nav-btn next" id="step2-next">Next</button>
+                    </div>
+                </form>
+            </div>
+            
+            <!-- Signup Form Step 3 -->
+            <div id="signup-step3" class="form-section">
+                <h2 style="text-align: center; margin-bottom: 20px; color: #2c3e50; transform: translateZ(25px);">Verification Documents</h2>
+                
+                <form id="signup3">
+                    <div class="form-group">
+                        <label>Upload Bar Council Certificate</label>
+                        <div class="file-upload" id="certificate-upload">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <p>Click to upload certificate</p>
+                            <p style="font-size: 12px; color: #7f8c8d;">PDF, JPG or PNG (Max 5MB)</p>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="experience">Years of Experience</label>
+                        <i class="input-icon fas fa-briefcase"></i>
+                        <input type="number" id="experience" min="0" max="50" placeholder="Enter years of experience" required>
+                    </div>
+                    
+                    <div class="nav-buttons">
+                        <button type="button" class="nav-btn prev" id="step3-prev">Previous</button>
+                        <button type="submit" class="nav-btn next">Submit for Verification</button>
+                    </div>
+                </form>
+            </div>
+            
+            <!-- Backend Console -->
+            <div class="backend-console">
+                <div class="console-header">
+                    <span>Backend Operations Console</span>
+                    <span id="console-status">Active</span>
+                </div>
+                <div class="console-log" id="console-log">
+                    <div class="log-entry">System initialized. Ready for requests.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Backend simulation
+            const backend = {
+                users: [],
+                pendingVerifications: [],
+                loggedInUser: null,
+                
+                // Add a log entry to the console
+                log: function(message, type = 'info') {
+                    const consoleLog = document.getElementById('console-log');
+                    const logEntry = document.createElement('div');
+                    logEntry.className = `log-entry ${type === 'success' ? 'log-success' : type === 'error' ? 'log-error' : ''}`;
+                    logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+                    consoleLog.appendChild(logEntry);
+                    consoleLog.scrollTop = consoleLog.scrollHeight;
+                },
+                
+                // Register a new user
+                register: function(userData) {
+                    // Check if user already exists
+                    if (this.users.some(user => user.email === userData.email)) {
+                        this.log(`Registration failed: Email ${userData.email} already exists`, 'error');
+                        return { success: false, message: 'Email already registered' };
+                    }
+                    
+                    // Add user to database
+                    userData.id = this.users.length + 1;
+                    userData.verified = false;
+                    userData.createdAt = new Date();
+                    this.users.push(userData);
+                    
+                    // Add to pending verifications
+                    this.pendingVerifications.push({
+                        userId: userData.id,
+                        email: userData.email,
+                        status: 'pending',
+                   submittedAt: new Date()
+                });
+                
+                this.log(`New user registered: ${userData.name} (${userData.email})`, 'success');
+                this.log(`User ${userData.email} added to verification queue`, 'info');
+                
+                return { success: true, message: 'Registration successful. Awaiting verification.' };
+            },
+            
+            // Verify user login
+            login: function(email, password) {
+                const user = this.users.find(u => u.email === email);
+                
+                if (!user) {
+                    this.log(`Login failed: User ${email} not found`, 'error');
+                    return { success: false, message: 'User not found' };
+                }
+                
+                if (user.password !== password) {
+                    this.log(`Login failed: Incorrect password for ${email}`, 'error');
+                    return { success: false, message: 'Incorrect password' };
+                }
+                
+                if (!user.verified) {
+                    this.log(`Login failed: User ${email} not verified`, 'error');
+                    return { success: false, message: 'Account not verified yet' };
+                }
+                
+                this.log(`User ${email} logged in successfully`, 'success');
+                this.loggedInUser = user;
+                return { success: true, message: 'Login successful', user: user };
+            },
+            
+            // Verify a user account (admin function)
+            verifyUser: function(userId) {
+                const user = this.users.find(u => u.id === userId);
+                if (user) {
+                    user.verified = true;
+                    const verification = this.pendingVerifications.find(v => v.userId === userId);
+                    if (verification) {
+                        verification.status = 'verified';
+                        verification.verifiedAt = new Date();
+                    }
+                    this.log(`User ${user.email} verified successfully`, 'success');
+                    return { success: true, message: 'User verified' };
+                }
+                return { success: false, message: 'User not found' };
+            },
+            
+            // Get pending verifications
+            getPendingVerifications: function() {
+                return this.pendingVerifications.filter(v => v.status === 'pending');
+            }
+        };
+        
+        // Form navigation
+        const loginForm = document.getElementById('login-form');
+        const step1Form = document.getElementById('signup-step1');
+        const step2Form = document.getElementById('signup-step2');
+        const step3Form = document.getElementById('signup-step3');
+        
+        // Buttons
+        const showSignupBtn = document.getElementById('show-signup');
+        const toLoginBtn = document.getElementById('to-login');
+        const step1NextBtn = document.getElementById('step1-next');
+        const step2PrevBtn = document.getElementById('step2-prev');
+        const step2NextBtn = document.getElementById('step2-next');
+        const step3PrevBtn = document.getElementById('step3-prev');
+        
+        // Show signup form
+        showSignupBtn.addEventListener('click', function() {
+            loginForm.classList.remove('active');
+            step1Form.classList.add('active');
+            updateProgressBar(1);
+            backend.log('User started registration process');
+        });
+        
+        // Back to login
+        toLoginBtn.addEventListener('click', function() {
+            step1Form.classList.remove('active');
+            loginForm.classList.add('active');
+            updateProgressBar(0);
+            backend.log('User returned to login screen');
+        });
+        
+        // Step 1 to Step 2
+        step1NextBtn.addEventListener('click', function() {
+            const name = document.getElementById('name').value;
+            const email = document.getElementById('signup-email').value;
+            const password = document.getElementById('signup-password').value;
+            const phone = document.getElementById('phone').value;
+            
+            if (name && email && password.length >= 8 && phone) {
+                step1Form.classList.remove('active');
+                step2Form.classList.add('active');
+                updateProgressBar(2);
+                backend.log(`Registration step 1 completed for ${email}`);
+            } else {
+                alert('Please fill all fields correctly. Password must be at least 8 characters.');
+                backend.log('Registration step 1 validation failed', 'error');
+            }
+        });
+        
+        // Step 2 to Step 1
+        step2PrevBtn.addEventListener('click', function() {
+            step2Form.classList.remove('active');
+            step1Form.classList.add('active');
+            updateProgressBar(1);
+            backend.log('User returned to previous registration step');
+        });
+        
+        // Step 2 to Step 3
+        step2NextBtn.addEventListener('click', function() {
+            const barNumber = document.getElementById('bar-number').value;
+            const jurisdiction = document.getElementById('jurisdiction').value;
+            const specializations = document.querySelectorAll('input[type="checkbox"]:checked');
+            
+            if (barNumber && jurisdiction && specializations.length > 0) {
+                step2Form.classList.remove('active');
+                step3Form.classList.add('active');
+                updateProgressBar(3);
+                backend.log(`Registration step 2 completed - Bar: ${barNumber}, Jurisdiction: ${jurisdiction}`);
+            } else {
+                alert('Please fill all fields and select at least one specialization.');
+                backend.log('Registration step 2 validation failed', 'error');
+            }
+        });
+        
+        // Step 3 to Step 2
+        step3PrevBtn.addEventListener('click', function() {
+            step3Form.classList.remove('active');
+            step2Form.classList.add('active');
+            updateProgressBar(2);
+            backend.log('User returned to previous registration step');
+        });
+        
+        // Final submission
+        document.getElementById('signup3').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const experience = document.getElementById('experience').value;
+            
+            if (experience) {
+                // Collect all form data
+                const userData = {
+                    name: document.getElementById('name').value,
+                    email: document.getElementById('signup-email').value,
+                    password: document.getElementById('signup-password').value,
+                    phone: document.getElementById('phone').value,
+                    barNumber: document.getElementById('bar-number').value,
+                    jurisdiction: document.getElementById('jurisdiction').value,
+                    specializations: Array.from(document.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.value),
+                    experience: parseInt(experience),
+                    certificate: "uploaded_certificate.pdf" // In a real app, this would be the uploaded file
+                };
+                
+                // Submit to backend
+                const result = backend.register(userData);
+                
+                if (result.success) {
+                    alert('Your application has been submitted for verification. You will receive an email once verified.');
+                    // Reset form and go back to login
+                    this.reset();
+                    step3Form.classList.remove('active');
+                    loginForm.classList.add('active');
+                    updateProgressBar(0);
+                } else {
+                    alert(result.message);
+                }
+            } else {
+                alert('Please enter your years of experience.');
+                backend.log('Registration validation failed: Missing experience', 'error');
+            }
+        });
+        
+        // Login form submission
+        document.getElementById('login').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            
+            if (email && password.length >= 8) {
+                const result = backend.login(email, password);
+                
+                if (result.success) {
+                    alert('Login successful! Redirecting to dashboard...');
+                    // In a real app, you would redirect or set a session
+                    backend.log(`User ${email} successfully logged in`, 'success');
+                } else {
+                    alert(result.message);
+                }
+            } else {
+                alert('Please enter valid credentials. Password must be at least 8 characters.');
+                backend.log('Login validation failed', 'error');
+            }
+        });
+        
+        // File upload interaction
+        document.getElementById('certificate-upload').addEventListener('click', function() {
+            backend.log('File upload dialog requested');
+            alert('In a real application, this would open a file dialog for upload.');
+            // Simulate file upload
+            setTimeout(() => {
+                backend.log('Certificate uploaded successfully', 'success');
+            }, 1000);
+        });
+        
+        // Update progress bar
+        function updateProgressBar(step) {
+            const steps = document.querySelectorAll('.progress-step');
+            steps.forEach((s, i) => {
+                if (i < step) {
+                    s.classList.add('completed');
+                    s.classList.remove('active');
+                } else if (i === step) {
+                    s.classList.add('active');
+                    s.classList.remove('completed');
+                } else {
+                    s.classList.remove('active', 'completed');
+                }
+            });
+        }
+        
+        // 3D card effect
+        const card = document.querySelector('.card');
+        document.addEventListener('mousemove', (e) => {
+            const x = (window.innerWidth / 2 - e.clientX) / 25;
+            const y = (window.innerHeight / 2 - e.clientY) / 25;
+            
+            card.style.transform = `rotateY(${x}deg) rotateX(${y}deg)`;
+        });
+        
+        // Remove transform when mouse leaves
+        document.addEventListener('mouseleave', () => {
+            card.style.transform = 'perspective(1000px) rotateY(0) rotateX(0)';
+        });
+        
+        // Simulate admin verification after 10 seconds
+        setTimeout(() => {
+            if (backend.pendingVerifications.length > 0) {
+                const verification = backend.pendingVerifications[0];
+                backend.verifyUser(verification.userId);
+                backend.log(`Admin action: Verified user ${verification.email}`);
+            }
+        }, 10000);
+    });
+</script>
