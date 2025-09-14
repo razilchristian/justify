@@ -40,18 +40,18 @@
       line-height:1.6;
     }
     .brand-logo {
-      height: 10%;
-      width: 20%;
+      height: 40px;
+      width: auto;
       display: block;
       object-fit: contain;
     }
 
     .logo-placeholder {
-      width: 100px;
-      height: 100px;
+      width: 40px;
+      height: 40px;
       background: linear-gradient(135deg, var(--primary), #6db2ff);
       border-radius: 10px;
-      display: none;
+      display: grid;
       place-items: center;
       color: #fff;
       font-weight: 900;
@@ -65,10 +65,10 @@
       border-bottom:1px solid rgba(15,27,45,.06);
     }
     .nav .wrap{
-      max-width:1160px;max-height:100px;margin:0 auto;padding:0px 0px;
+      max-width:1160px;margin:0 auto;padding:12px 20px;
       display:flex;align-items:center;justify-content:space-between;
     }
-    .brand{display:flex;gap:10px;align-items:center;font-weight:700;color:var(--text)}
+    .brand{display:flex;gap:10px;align-items:center;font-weight:700;color:var(--text);text-decoration:none}
     .brand-badge{
       width:34px;height:34px;border-radius:10px;
       background:linear-gradient(135deg,var(--primary),#7fb6ff);
@@ -77,6 +77,7 @@
     }
     .links{display:flex;gap:18px;align-items:center}
     .links a{color:var(--muted);text-decoration:none;font-weight:600;font-size:14px}
+    .links a:hover{color:var(--primary)}
     .btn{
       padding:10px 16px;border-radius:10px;border:1px solid transparent;
       font-weight:700;font-size:14px;text-decoration:none;display:inline-flex;align-items:center;gap:8px;
@@ -358,6 +359,60 @@
     .modal-input{width:100%;padding:12px;border:1px solid rgba(15,27,45,.12);border-radius:10px;margin-bottom:16px;font-size:14px}
     .modal-footer{display:flex;gap:10px;justify-content:flex-end}
 
+    .file-upload-modal .modal-content {
+      max-width: 600px;
+    }
+    .file-upload-area {
+      border: 2px dashed rgba(15,27,45,.15);
+      border-radius: 12px;
+      padding: 30px;
+      text-align: center;
+      margin-bottom: 20px;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    .file-upload-area:hover {
+      border-color: var(--primary);
+      background: rgba(43,134,255,.03);
+    }
+    .file-upload-area i {
+      font-size: 32px;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+    .file-upload-text {
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+    .file-upload-text strong {
+      color: var(--primary);
+    }
+    .file-list {
+      margin-top: 15px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .file-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
+      background: rgba(15,27,45,.04);
+      border-radius: 8px;
+      margin-bottom: 8px;
+    }
+    .file-item-name {
+      font-size: 14px;
+      color: var(--text);
+    }
+    .file-item-remove {
+      color: var(--red);
+      cursor: pointer;
+      background: none;
+      border: none;
+      font-size: 16px;
+    }
+
     @media (prefers-reduced-motion: no-preference){
       .reveal{
         opacity:0;
@@ -405,10 +460,10 @@
   <!-- Nav -->
   <header class="nav">
     <div class="wrap">
-      <div class="brand reveal reveal-left">
-        <img src="/logo.png" alt="JustiBot Logo" class="brand-logo">
+      <a href="#home" class="brand reveal reveal-left">
+        <div class="logo-placeholder">J</div>
         <div>JustiBot</div>
-      </div>
+      </a>
       <nav class="links">
         <a href="#features">Features</a>
         <a href="#advanced">Advanced</a>
@@ -456,7 +511,7 @@
               <p class="bot-status online">Online • Ready to help</p>
             </div>
             <div class="bot-actions">
-              <button class="bot-action" title="Clear chat"><i class="fas fa-broom"></i></button>
+              <button class="bot-action" title="Clear chat" id="clearChatBtn"><i class="fas fa-broom"></i></button>
               <button class="bot-action" title="Settings"><i class="fas fa-cog"></i></button>
             </div>
           </div>
@@ -639,7 +694,7 @@
 
   <footer>
     <div class="foot">
-      <div class="brand"><div class="brand-badge"></div>JustiBot</div>
+      <div class="brand"><div class="brand-badge">J</div>JustiBot</div>
       <div class="mini">
         <a href="#features">Features</a>
         <a href="#advanced">Advanced</a>
@@ -660,14 +715,38 @@
         <input type="text" class="modal-input" placeholder="Full Name">
         <input type="email" class="modal-input" placeholder="Work Email">
         <input type="text" class="modal-input" placeholder="Organization">
-                <input type="text" class="modal-input" placeholder="Number of Users">
+        <input type="text" class="modal-input" placeholder="Number of Users">
       </div>
       <div class="modal-footer">
-        <button class="btn btn-ghost">Cancel</button>
-        <button class="btn btn-primary">Submit Request</button>
+        <button class="btn btn-ghost" id="modalCancelBtn">Cancel</button>
+        <button class="btn btn-primary" id="modalSubmitBtn">Submit Request</button>
       </div>
     </div>
   </div>
+
+  <!-- File Upload Modal -->
+  <div class="modal file-upload-modal" id="uploadModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Upload Documents</h3>
+        <button class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="file-upload-area" id="dropArea">
+          <i class="fas fa-cloud-upload-alt"></i>
+          <div class="file-upload-text">Drop files here or <strong>click to browse</strong></div>
+          <div class="file-upload-text" style="font-size: 12px;">Supported formats: PDF, DOCX, TXT (Max 5MB each)</div>
+        </div>
+        <input type="file" id="fileInput" multiple style="display: none;">
+        <div class="file-list" id="fileList"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" id="uploadCancelBtn">Cancel</button>
+        <button class="btn btn-primary" id="uploadSubmitBtn">Upload Documents</button>
+      </div>
+    </div>
+  </div>
+
 <script>
 // =====================
 // Element references
@@ -677,8 +756,22 @@ const chatArea = document.getElementById('chatArea');
 const input = document.getElementById('prompt');
 const btn = document.getElementById('sendBtn');
 const uploadBtn = document.getElementById('uploadBtn');
-const grokToggle = document.getElementById('grokToggle');
+const clearChatBtn = document.getElementById('clearChatBtn');
 const quickReplies = document.getElementById('quickReplies');
+const enterpriseBtn = document.getElementById('enterpriseBtn');
+const enterpriseModal = document.getElementById('enterpriseModal');
+const modalCloseButtons = document.querySelectorAll('.modal-close');
+const modalCancelBtn = document.getElementById('modalCancelBtn');
+const uploadModal = document.getElementById('uploadModal');
+const dropArea = document.getElementById('dropArea');
+const fileInput = document.getElementById('fileInput');
+const fileList = document.getElementById('fileList');
+const uploadCancelBtn = document.getElementById('uploadCancelBtn');
+const uploadSubmitBtn = document.getElementById('uploadSubmitBtn');
+
+// Session management
+let currentSessionId = 'default-' + Date.now();
+let uploadedFiles = [];
 
 // Hide the OpenAI toggle as requested
 document.querySelector('.api-toggle').style.display = 'none';
@@ -701,6 +794,10 @@ tabs.forEach(t => t.addEventListener('click', () => {
     appendBubble('AI Analysis panel open.', 'bot', true);
   } else if (tabName === 'chat') {
     appendBubble('Standard chat panel open.', 'bot', true);
+  } else if (tabName === 'draft') {
+    appendBubble('Document drafting panel open. Describe what you need drafted.', 'bot', true);
+  } else if (tabName === 'judgment') {
+    appendBubble('Judgment search panel open. Ask about specific case law.', 'bot', true);
   }
 }));
 
@@ -775,7 +872,8 @@ async function callOpenAI(text, history = chatHistory) {
       body: JSON.stringify({
         message: text,
         history,
-        model: 'gpt-4',
+        session_id: currentSessionId,
+        model: 'gpt-3.5-turbo',
         temperature: 0.2,
         max_tokens: 900
       })
@@ -831,26 +929,127 @@ function stripHTML(html) {
 }
 
 // =====================
-// Upload button logic
+// File upload handling
 // =====================
 if (uploadBtn) {
   uploadBtn.addEventListener('click', () => {
-    const docText = prompt('Paste document text for analysis (max 5000 characters):');
-    if (docText && docText.trim()) {
-      appendBubble('Uploading document for analysis...', 'bot', true);
-      
-      // Add document to chat history
-      chatHistory.push({ 
-        role: 'user', 
-        content: `[DOCUMENT UPLOADED]: ${docText.substring(0, 1000)}${docText.length > 1000 ? '...' : ''}` 
-      });
-      
-      setTimeout(() => {
-        appendBubble('✅ Document uploaded. Ask to analyze or summarize it.', 'bot', true);
-      }, 1000);
-    }
+    uploadModal.classList.add('active');
   });
 }
+
+// Handle file selection
+dropArea.addEventListener('click', () => {
+  fileInput.click();
+});
+
+fileInput.addEventListener('change', handleFileSelect);
+
+// Handle drag and drop
+['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+  dropArea.addEventListener(eventName, preventDefaults, false);
+});
+
+function preventDefaults(e) {
+  e.preventDefault();
+  e.stopPropagation();
+}
+
+['dragenter', 'dragover'].forEach(eventName => {
+  dropArea.addEventListener(eventName, highlight, false);
+});
+
+['dragleave', 'drop'].forEach(eventName => {
+  dropArea.addEventListener(eventName, unhighlight, false);
+});
+
+function highlight() {
+  dropArea.style.borderColor = 'var(--primary)';
+  dropArea.style.backgroundColor = 'rgba(43,134,255,.05)';
+}
+
+function unhighlight() {
+  dropArea.style.borderColor = 'rgba(15,27,45,.15)';
+  dropArea.style.backgroundColor = 'transparent';
+}
+
+dropArea.addEventListener('drop', handleDrop, false);
+
+function handleDrop(e) {
+  const dt = e.dataTransfer;
+  const files = dt.files;
+  handleFiles(files);
+}
+
+function handleFileSelect(e) {
+  const files = e.target.files;
+  handleFiles(files);
+}
+
+function handleFiles(files) {
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    if (file.size > 5 * 1024 * 1024) {
+      alert('File too large: ' + file.name + '. Maximum size is 5MB.');
+      continue;
+    }
+    
+    uploadedFiles.push(file);
+    addFileToList(file);
+  }
+}
+
+function addFileToList(file) {
+  const fileItem = document.createElement('div');
+  fileItem.className = 'file-item';
+  fileItem.innerHTML = `
+    <div class="file-item-name">${file.name}</div>
+    <button class="file-item-remove" data-filename="${file.name}">&times;</button>
+  `;
+  fileList.appendChild(fileItem);
+  
+  // Add remove functionality
+  fileItem.querySelector('.file-item-remove').addEventListener('click', (e) => {
+    const filename = e.target.getAttribute('data-filename');
+    uploadedFiles = uploadedFiles.filter(f => f.name !== filename);
+    fileItem.remove();
+  });
+}
+
+uploadSubmitBtn.addEventListener('click', async () => {
+  if (uploadedFiles.length === 0) {
+    alert('Please select at least one file to upload.');
+    return;
+  }
+  
+  try {
+    // For demo purposes, we'll just show a success message
+    // In a real implementation, you would upload files to the server
+    appendBubble(`Uploaded ${uploadedFiles.length} document(s) for analysis.`, 'bot', true);
+    
+    // Add document info to chat history
+    uploadedFiles.forEach(file => {
+      chatHistory.push({ 
+        role: 'user', 
+        content: `[DOCUMENT UPLOADED]: ${file.name} (${(file.size/1024).toFixed(0)}KB)` 
+      });
+    });
+    
+    // Close modal and reset
+    uploadModal.classList.remove('active');
+    fileList.innerHTML = '';
+    uploadedFiles = [];
+    
+  } catch (error) {
+    console.error('Upload error:', error);
+    alert('Error uploading files. Please try again.');
+  }
+});
+
+uploadCancelBtn.addEventListener('click', () => {
+  uploadModal.classList.remove('active');
+  fileList.innerHTML = '';
+  uploadedFiles = [];
+});
 
 // =====================
 // Quick replies
@@ -867,40 +1066,48 @@ if (quickReplies) {
 // =====================
 // Clear chat
 // =====================
-const clearChatBtn = document.querySelector('.bot-action[title="Clear chat"]');
 if (clearChatBtn) {
   clearChatBtn.addEventListener('click', () => {
     if (confirm('Clear all chat messages?')) {
       chatArea.innerHTML = '';
       chatHistory.length = 0;
+      currentSessionId = 'default-' + Date.now();
       appendInitialGreeting();
     }
   });
 }
 
 // =====================
-// Enterprise modal wiring
+// Modal handling
 // =====================
-const enterpriseModal = document.getElementById('enterpriseModal');
-const enterpriseBtn = document.getElementById('enterpriseBtn');
-const modalClose = document.querySelector('.modal-close');
-
-if (enterpriseBtn && enterpriseModal && modalClose) {
+if (enterpriseBtn && enterpriseModal) {
   enterpriseBtn.addEventListener('click', e => {
     e.preventDefault();
     enterpriseModal.classList.add('active');
   });
-  
-  modalClose.addEventListener('click', () => {
+}
+
+modalCloseButtons.forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.modal').forEach(modal => {
+      modal.classList.remove('active');
+    });
+  });
+});
+
+if (modalCancelBtn) {
+  modalCancelBtn.addEventListener('click', () => {
     enterpriseModal.classList.remove('active');
   });
-  
-  enterpriseModal.addEventListener('click', e => {
-    if (e.target === enterpriseModal) {
-      enterpriseModal.classList.remove('active');
+}
+
+document.querySelectorAll('.modal').forEach(modal => {
+  modal.addEventListener('click', e => {
+    if (e.target === modal) {
+      modal.classList.remove('active');
     }
   });
-}
+});
 
 // =====================
 // Input bindings
