@@ -1,567 +1,524 @@
-import os
-import re
-import uuid
-import time
-import numpy as np
-import pandas as pd
-import spacy
-import requests
-from html import unescape
-from datetime import datetime
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.preprocessing import normalize
-from flask import Flask, request, jsonify, send_from_directory, Response, stream_with_context
+from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
-from functools import lru_cache
-import werkzeug.exceptions as wz
-from openai import OpenAI
+import openai
+import os
 import json
-from typing import List, Dict, Any
+import tempfile
+from docx import Document
+from docx.shared import Pt
+from datetime import datetime
+import PyPDF2
+import re
+import time
+import pandas as pd
+import numpy as np
 
-# -----------------------------------------------------------------------------
-# Environment / OpenAI
-# -----------------------------------------------------------------------------
+app = Flask(__name__)
+CORS(app)
+
+# Initialize OpenAI (you'll need to set your API key in environment variables)
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-if not OPENAI_API_KEY:
-    raise RuntimeError("Please set the OPENAI_API_KEY environment variable.")
-client = OpenAI()  # reads key from env by default
+openai.api_key = OPENAI_API_KEY
 
-# -----------------------------------------------------------------------------
-# Flask app
-# -----------------------------------------------------------------------------
-app = Flask(__name__, static_folder='.')
-CORS(app)  # enable CORS for browser clients
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max
+# In-memory storage for demo purposes (use a database in production)
+chat_sessions = {}
+uploaded_documents = {}
 
-# -----------------------------------------------------------------------------
-# Error handlers
-# -----------------------------------------------------------------------------
-@app.errorhandler(wz.BadRequest)
-def handle_400(e):
-    return jsonify({"error": "bad_request", "message": str(e)}), 400
+# System prompt for legal assistant
+LEGAL_ASSISTANT_PROMPT = """
+You are JustiBot, an AI legal assistant specialized in Indian law. You provide accurate, helpful legal information while always reminding users that you are an AI and not a substitute for professional legal advice.
 
-@app.errorhandler(wz.NotFound)
-def handle_404(e):
-    return jsonify({"error": "not_found", "message": "Route not found"}), 404
+Key capabilities:
+1. Legal drafting (contracts, petitions, notices)
+2. Case law research and analysis
+3. Legal document review
+4. Explanation of legal concepts
+5. Scenario analysis and issue spotting
+6. Compliance guidance
 
-@app.errorhandler(Exception)
-def handle_500(e):
-    return jsonify({"error": "server_error", "message": str(e)}), 500
+Always:
+- Be precise and cite relevant Indian laws when possible
+- Maintain professional tone
+- Suggest consulting actual lawyers for serious matters
+- Acknowledge limitations when unsure
+"""
 
-# -----------------------------------------------------------------------------
-# Legal Database APIs (Indian Legal Resources)
-# -----------------------------------------------------------------------------
+# Legal database and training data
 class LegalDatabase:
     def __init__(self):
-        self.sources = {
-            'indiankanoon': 'https://api.indiankanoon.org',
-            'supremecourt': 'https://api.main.sci.gov.in',
-            'manupatra': 'https://api.manupatra.com'
-        }
+        self.cases = []
+        self.statutes = []
         self.training_data = []
     
-    def search_live_cases(self, query, court=None, year=None):
-        """Search live cases from various Indian legal databases"""
-        results = []
-        
+    def load_cases_from_csv(self, filepath):
         try:
-            # Indian Kanoon API (public cases) - this is a placeholder
-            # Actual implementation would require proper API access
-            print(f"Would search live cases for: {query}")
-            
-            # Simulate some recent case results for demonstration
-            current_year = datetime.now().year
-            if "constitution" in query.lower():
-                results.append({
-                    'source': 'Simulated Recent Case',
-                    'title': 'Recent Constitutional Matter (2024)',
-                    'citation': 'AIR 2024 SC 1',
-                    'date': '2024-01-15',
-                    'summary': 'A recent constitutional interpretation case addressing fundamental rights',
-                    'url': '#'
-                })
-            
-        except Exception as e:
-            print(f"Live search error: {e}")
-        
-        return results
-
-    def add_training_data(self, question: str, answer: str, category: str = "general"):
-        """Add training data to improve responses"""
-        self.training_data.append({
-            "question": question,
-            "answer": answer,
-            "category": category,
-            "timestamp": datetime.now().isoformat()
-        })
+            df = pd.read_csv(filepath)
+            self.cases = df.to_dict('records')
+            return len(self.cases)
+        except:
+            # Return dummy data if file not found
+            self.cases = [
+                {
+                    "case_no": "AIR 1973 SC 1461",
+                    "title": "Kesavananda Bharati vs State of Kerala",
+                    "year": 1973,
+                    "court": "Supreme Court of India",
+                    "summary": "Landmark case that established the Basic Structure Doctrine of the Constitution",
+                    "key_issues": "Constitutional amendments, Fundamental rights, Basic structure doctrine",
+                    "outcome": "The Supreme Court outlined the basic structure doctrine of the Constitution"
+                },
+                {
+                    "case_no": "AIR 1980 SC 1789",
+                    "title": "Minerva Mills Ltd. vs Union of India",
+                    "year": 1980,
+                    "court": "Supreme Court of India",
+                    "summary": "Strengthened the basic structure doctrine laid down in Kesavananda Bharati case",
+                    "key_issues": "Constitutional amendments, Judicial review, Fundamental rights",
+                    "outcome": "Struck down parts of the 42nd Amendment that prevented judicial review of constitutional amendments"
+                }
+            ]
+            return len(self.cases)
+    
+    def load_training_data(self):
+        # Pre-load training examples for the AI
+        self.training_data = [
+            {
+                "input": "How to draft a legal notice?",
+                "output": "A legal notice should include: 1. sender and recipient details, 2. clear subject line, 3. facts of the case, 4. legal basis for the claim, 5. relief sought, 6. time given for compliance, and 7. consequences of non-compliance. Would you like me to help draft a specific notice?"
+            },
+            {
+                "input": "What is the difference between civil and criminal law?",
+                "output": "Civil law deals with disputes between individuals/organizations where compensation may be awarded. Criminal law deals with crimes against the state/society where punishment may be imposed. Key differences: purpose (compensation vs punishment), burden of proof (balance of probabilities vs beyond reasonable doubt), and initiating party (individual vs state)."
+            },
+            {
+                "input": "How to file a consumer complaint?",
+                "output": "To file a consumer complaint: 1. Gather all documents ( bills, correspondence, evidence), 2. Draft a complaint with facts and relief sought, 3. File with the appropriate consumer forum based on the value of claim, 4. Pay the required fee. The process is designed to be consumer-friendly and doesn't necessarily require a lawyer."
+            }
+        ]
         return len(self.training_data)
 
-    def get_training_data(self, category: str = None):
-        """Retrieve training data"""
-        if category:
-            return [item for item in self.training_data if item["category"] == category]
-        return self.training_data
-
+# Initialize legal database
 legal_db = LegalDatabase()
 
-# -----------------------------------------------------------------------------
-# Data loading and NLP
-# -----------------------------------------------------------------------------
-def clean_html(text):
-    if not isinstance(text, str):
-        return ""
-    clean = re.sub(r"<.*?>", "", text)
-    return unescape(clean).strip()
+def preload_training_data():
+    """Pre-load training data and cases at startup"""
+    print("Loading legal cases...")
+    num_cases = legal_db.load_cases_from_csv("data/legal_cases.csv")
+    
+    print("Loading training data...")
+    num_training = legal_db.load_training_data()
+    
+    print(f"Loaded {num_cases} legal cases and {num_training} training examples")
+    return num_cases, num_training
 
-def load_data():
-    print("Loading dataset...")
-    start = time.time()
-    base_dir = os.path.join(os.path.dirname(__file__), "legal_datasets")
-    path = os.path.join(base_dir, "justice.csv")
-    
-    # Load both static data and recent cases
-    cases = []
-    
-    # Load static dataset if available
-    if os.path.isfile(path):
-        df = pd.read_csv(path)
-        # Normalize column names if needed
-        if "second_p" in df.columns:
-            df = df.rename(columns={"second_p": "second_party"})
-        if "decision_t" in df.columns:
-            df = df.rename(columns={"decision_t": "decision_type"})
-        if "dispositio" in df.columns:
-            df = df.rename(columns={"dispositio": "disposition"})
-        df["clean_facts"] = df.get("facts", "").fillna("").apply(clean_html)
-        combined = []
-        for _, row in df.iterrows():
-            parts = []
-            for col in ["name", "first_party", "second_party", "disposition", "clean_facts"]:
-                if col in df.columns and pd.notna(row[col]):
-                    parts.append(str(row[col]))
-            combined.append(" ".join(parts))
-        df["combined"] = combined
-        cases = df.to_dict('records')
-        print(f"Loaded {len(cases)} static cases")
-    else:
-        print("Static dataset not found, using live sources only")
-        cases = []
-    
-    print(f"Data loading completed in {time.time()-start:.2f} sec")
-    return cases
-
-def setup_nlp():
-    print("Loading spaCy model...")
-    start = time.time()
+@app.route('/openai/chat', methods=['POST'])
+def chat_with_openai():
     try:
-        nlp_ = spacy.load("en_core_web_md", disable=["parser", "ner"])
-    except Exception:
-        nlp_ = spacy.blank("en")
-        print("Using basic English model - consider installing en_core_web_md for better results")
-    print(f"spaCy model loaded in {time.time()-start:.2f} sec")
-    return nlp_
-
-df_cases = load_data()
-nlp = setup_nlp()
-
-def create_search_index(docs):
-    print("Building TF-IDF index...")
-    start = time.time()
-    if not docs:
-        return None, None
-    
-    vectorizer = TfidfVectorizer(max_features=800, stop_words="english", min_df=2, max_df=0.8)
-    tfidf_matrix = vectorizer.fit_transform(docs)
-    print(f"TF-IDF index done in {time.time()-start:.2f} sec")
-    return vectorizer, tfidf_matrix
-
-# Only create index if we have static data
-if df_cases and len(df_cases) > 0:
-    combined_texts = [case.get('combined', '') for case in df_cases]
-    vectorizer, tfidf_matrix = create_search_index(combined_texts)
-else:
-    vectorizer, tfidf_matrix = None, None
-
-# -----------------------------------------------------------------------------
-# Enhanced Training Functions
-# -----------------------------------------------------------------------------
-def train_legal_knowledge(questions: List[str], answers: List[str]):
-    """Train the system with legal knowledge base"""
-    trained_count = 0
-    for question, answer in zip(questions, answers):
-        legal_db.add_training_data(question, answer, "legal_knowledge")
-        trained_count += 1
-    return trained_count
-
-def generate_training_embeddings():
-    """Generate embeddings for training data to improve search"""
-    if not legal_db.training_data:
-        return
-    
-    training_texts = [f"{item['question']} {item['answer']}" for item in legal_db.training_data]
-    # Store embeddings for semantic search
-    # This would be implemented with a proper vector database in production
-
-# -----------------------------------------------------------------------------
-# Search Functions
-# -----------------------------------------------------------------------------
-@lru_cache(maxsize=256)
-def search_cases(text, top_k=5, threshold=0.15):
-    results = []
-    
-    # Search live databases first
-    live_results = legal_db.search_live_cases(text)
-    for result in live_results[:top_k]:
-        results.append({
-            'type': 'live',
-            'data': result,
-            'score': 0.9  # High score for live results
-        })
-    
-    # Search static dataset if available
-    if vectorizer and tfidf_matrix is not None:
-        try:
-            vec = vectorizer.transform([text])
-            sims = (tfidf_matrix @ vec.T).toarray().flatten()
-            idxs = sims.argsort()[::-1]
-            for idx in idxs:
-                if sims[idx] < threshold or len(results) >= top_k:
-                    break
-                if idx < len(df_cases):
-                    results.append({
-                        'type': 'static',
-                        'data': df_cases[idx],
-                        'score': sims[idx]
-                    })
-        except Exception as e:
-            print(f"Static search error: {e}")
-    
-    return results[:top_k]
-
-def cosine_sim(vec, mat):
-    vec = vec / (np.linalg.norm(vec) + 1e-12)
-    return mat @ vec
-
-# -----------------------------------------------------------------------------
-# In-memory document store
-# -----------------------------------------------------------------------------
-document_store = {}
-
-def store_document(text, doc_type="general"):
-    doc_id = str(uuid.uuid4())
-    document_store[doc_id] = {
-        "text": text[:5000],
-        "type": doc_type,
-        "timestamp": datetime.now().isoformat()
-    }
-    return doc_id
-
-# -----------------------------------------------------------------------------
-# Enhanced OpenAI Integration with Training
-# -----------------------------------------------------------------------------
-def build_enhanced_messages(user_msg: str, history: list):
-    """Build messages with enhanced context from training data"""
-    
-    # System prompt with enhanced knowledge - REMOVED MARKDOWN FORMATTING
-    system_prompt = (
-        "You are JustiBot, a senior Indian legal research assistant with specialized knowledge in Indian law. "
-        "You have access to comprehensive legal databases and training data. "
-        "Answer concisely with accurate points and include citations to relevant statutes and case law when appropriate. "
-        "If information is insufficient, ask for missing facts. Avoid fabricating citations. "
-        "Always be transparent about the limitations of your knowledge regarding recent developments. "
-        "Important: My knowledge is based on training data up to October 2023. "
-        "For the most current legal developments, consult official legal databases or practicing legal professionals."
-        "DO NOT use markdown formatting like **bold** or *italic* in your responses. Use plain text only."
-    )
-    
-    messages = [{"role": "system", "content": system_prompt}]
-    
-    # Add relevant training data context
-    relevant_training = find_relevant_training(user_msg)
-    if relevant_training:
-        training_context = "\n\nRelevant legal knowledge:\n" + "\n".join(
-            [f"Q: {item['question']}\nA: {item['answer']}" for item in relevant_training[:3]]
-        )
-        messages[0]["content"] += training_context
-    
-    # Add conversation history
-    if isinstance(history, list):
-        for t in history:
-            role = t.get("role")
-            content = t.get("content")
-            if role in ("user", "assistant") and isinstance(content, str) and content.strip():
-                # Clean any markdown from previous responses
-                cleaned_content = re.sub(r'\*\*(.*?)\*\*', r'\1', content)  # Remove **bold**
-                cleaned_content = re.sub(r'\*(.*?)\*', r'\1', cleaned_content)  # Remove *italic*
-                messages.append({"role": role, "content": cleaned_content})
-    
-    messages.append({"role": "user", "content": user_msg})
-    return messages
-
-def find_relevant_training(query: str, max_results: int = 3):
-    """Find relevant training data based on query"""
-    if not legal_db.training_data:
-        return []
-    
-    # Simple keyword-based matching (could be enhanced with embeddings)
-    query_lower = query.lower()
-    relevant = []
-    
-    for item in legal_db.training_data:
-        question = item['question'].lower()
-        answer = item['answer'].lower()
+        data = request.json
+        user_message = data.get('message', '')
+        history = data.get('history', [])
+        model = data.get('model', 'gpt-3.5-turbo')
         
-        # Check if query terms appear in question or answer
-        score = sum(1 for word in query_lower.split() if word in question or word in answer)
-        if score > 0:
-            relevant.append((item, score))
+        # Prepare messages with system prompt and history
+        messages = [{"role": "system", "content": LEGAL_ASSISTANT_PROMPT}]
+        
+        # Add history if provided
+        for msg in history:
+            messages.append({"role": msg["role"], "content": msg["content"]})
+        
+        # Add current message
+        messages.append({"role": "user", "content": user_message})
+        
+        # Call OpenAI API
+        response = openai.ChatCompletion.create(
+            model=model,
+            messages=messages,
+            temperature=0.2,
+            max_tokens=900
+        )
+        
+        ai_response = response.choices[0].message['content']
+        
+        return jsonify({"response": ai_response})
     
-    # Sort by relevance score and return top results
-    relevant.sort(key=lambda x: x[1], reverse=True)
-    return [item[0] for item in relevant[:max_results]]
-
-def clean_response(text: str) -> str:
-    """Clean markdown formatting from response text"""
-    if not text:
-        return text
-    
-    # Remove **bold** formatting
-    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
-    # Remove *italic* formatting
-    text = re.sub(r'\*(.*?)\*', r'\1', text)
-    # Remove other markdown elements
-    text = re.sub(r'#+\s*', '', text)  # Remove headers
-    text = re.sub(r'`(.*?)`', r'\1', text)  # Remove inline code
-    text = re.sub(r'\[(.*?)\]\(.*?\)', r'\1', text)  # Remove links but keep text
-    
-    return text
-
-# -----------------------------------------------------------------------------
-# Routes - Static and Health
-# -----------------------------------------------------------------------------
-@app.route("/")
-def index():
-    return send_from_directory(".", "index.html")
-
-@app.route("/health")
-def health():
-    return jsonify({
-        "ok": True, 
-        "rows": len(df_cases), 
-        "ready": True, 
-        "documents_stored": len(document_store),
-        "training_examples": len(legal_db.training_data)
-    })
-
-@app.route("/stats")
-def stats():
-    return jsonify({
-        "cases": len(df_cases), 
-        "documents": len(document_store),
-        "training_data": len(legal_db.training_data)
-    })
-
-@app.route("/api-status")
-def api_status():
-    uptime = time.time() - app.config.get("START_TIME", time.time())
-    return jsonify({
-        "status": "active", 
-        "uptime": uptime, 
-        "cases": len(df_cases), 
-        "documents": len(document_store),
-        "training_examples": len(legal_db.training_data)
-    })
-
-@app.route('/logo.png')
-def serve_logo():
-    return send_from_directory('.', 'logo.png')
-
-# -----------------------------------------------------------------------------
-# Document Management Routes
-# -----------------------------------------------------------------------------
-@app.route("/upload", methods=["POST"])
-def upload():
-    try:
-        data = request.get_json() or {}
-        text = data.get("text")
-        t = data.get("type", "general")
-        if not text:
-            return jsonify({"error": "No text provided"}), 400
-        doc_id = store_document(text, t)
-        return jsonify({"success": True, "id": doc_id, "message": "Document stored."})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route("/documents", methods=["GET"])
-def documents():
-    return jsonify({
-        "count": len(document_store),
-        "documents": [
-            {"id": k, "type": v["type"], "size": len(v["text"]), "timestamp": v["timestamp"]}
-            for k, v in document_store.items()
-        ],
-    })
+@app.route('/openai/chat-stream', methods=['POST'])
+def chat_with_openai_stream():
+    # This would implement streaming responses
+    # For simplicity, we'll use the non-streaming version in this demo
+    return chat_with_openai()
 
-@app.route("/clear-documents", methods=["POST"])
-def clear_docs():
-    global document_store
-    document_store = {}
-    return jsonify({"success": True, "message": "Cleared all documents."})
-
-# -----------------------------------------------------------------------------
-# Training Routes
-# -----------------------------------------------------------------------------
-@app.route("/train", methods=["POST"])
-def train_model():
+@app.route('/upload', methods=['POST'])
+def upload_document():
     try:
-        data = request.get_json() or {}
-        questions = data.get("questions", [])
-        answers = data.get("answers", [])
-        category = data.get("category", "general")
+        data = request.json
+        text = data.get('text', '')
+        session_id = data.get('session_id', 'default')
         
-        if len(questions) != len(answers):
-            return jsonify({"error": "Questions and answers must be of equal length"}), 400
+        if session_id not in uploaded_documents:
+            uploaded_documents[session_id] = []
         
-        trained_count = 0
-        for question, answer in zip(questions, answers):
-            legal_db.add_training_data(question, answer, category)
-            trained_count += 1
+        # Store document (in production, you'd store this properly)
+        uploaded_documents[session_id].append({
+            'text': text[:5000],  # Limit size for demo
+            'timestamp': datetime.now().isoformat()
+        })
         
-        generate_training_embeddings()
+        return jsonify({"status": "success", "message": "Document uploaded successfully"})
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/analyze-documents', methods=['POST'])
+def analyze_documents():
+    try:
+        data = request.json
+        session_id = data.get('session_id', 'default')
+        question = data.get('question', '')
+        
+        if session_id not in uploaded_documents or not uploaded_documents[session_id]:
+            return jsonify({"error": "No documents found for analysis"}), 400
+        
+        # Get all uploaded documents
+        documents_text = "\n\n".join([doc['text'] for doc in uploaded_documents[session_id]])
+        
+        # Prepare analysis prompt
+        analysis_prompt = f"""
+        Analyze the following legal documents and answer the user's question.
+        
+        DOCUMENTS:
+        {documents_text}
+        
+        QUESTION: {question}
+        
+        Provide a comprehensive analysis with:
+        1. Key findings from the documents
+        2. Relevant legal provisions
+        3. Potential issues or concerns
+        4. Recommendations
+        """
+        
+        # Call OpenAI for analysis
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": LEGAL_ASSISTANT_PROMPT},
+                {"role": "user", "content": analysis_prompt}
+            ],
+            temperature=0.2,
+            max_tokens=1500
+        )
+        
+        analysis = response.choices[0].message['content']
+        
+        return jsonify({"analysis": analysis})
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/draft-document', methods=['POST'])
+def draft_document():
+    try:
+        data = request.json
+        doc_type = data.get('type', 'contract')
+        requirements = data.get('requirements', '')
+        jurisdiction = data.get('jurisdiction', 'India')
+        
+        # Prepare drafting prompt
+        draft_prompt = f"""
+        Draft a {doc_type} for Indian jurisdiction with the following requirements:
+        
+        {requirements}
+        
+        Please provide a comprehensive, professionally formatted legal document with:
+        1. Appropriate headings and sections
+        2. Standard legal language
+        3. Placeholders for specific details in [brackets]
+        4. Relevant legal provisions for {jurisdiction}
+        """
+        
+        # Call OpenAI for drafting
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": LEGAL_ASSISTANT_PROMPT},
+                {"role": "user", "content": draft_prompt}
+            ],
+            temperature=0.3,
+            max_tokens=2000
+        )
+        
+        draft = response.choices[0].message['content']
+        
+        return jsonify({"draft": draft})
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/find-judgments', methods=['POST'])
+def find_judgments():
+    try:
+        data = request.json
+        issue = data.get('issue', '')
+        jurisdiction = data.get('jurisdiction', 'Supreme Court of India')
+        limit = data.get('limit', 5)
+        
+        # First, try to find matches in our database
+        matching_cases = []
+        for case in legal_db.cases:
+            if (issue.lower() in case.get('key_issues', '').lower() or 
+                issue.lower() in case.get('summary', '').lower() or
+                issue.lower() in case.get('title', '').lower()):
+                matching_cases.append(case)
+                if len(matching_cases) >= limit:
+                    break
+        
+        # If we found cases in our database, return them
+        if matching_cases:
+            return jsonify({
+                "judgments": matching_cases,
+                "source": "local_database"
+            })
+        
+        # If no local matches, use OpenAI to find relevant judgments
+        judgment_prompt = f"""
+        Based on your knowledge of Indian case law, provide information about relevant judgments for the following legal issue:
+        
+        {issue}
+        
+        Please include:
+        1. Key case names and citations
+        2. Summary of legal principles established
+        3. Relevance to the issue presented
+        4. Any limitations or subsequent developments
+        """
+        
+        # Call OpenAI for judgment search
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": LEGAL_ASSISTANT_PROMPT},
+                {"role": "user", "content": judgment_prompt}
+            ],
+            temperature=0.2,
+            max_tokens=1500
+        )
+        
+        judgments = response.choices[0].message['content']
         
         return jsonify({
-            "success": True, 
-            "trained_count": trained_count,
-            "total_training_examples": len(legal_db.training_data)
+            "judgments": judgments,
+            "source": "openai"
         })
+    
     except Exception as e:
-        return jsonify({"error": "training_error", "message": str(e)}), 500
+        return jsonify({"error": str(e)}), 500
 
-@app.route("/training-data", methods=["GET"])
-def get_training_data():
-    category = request.args.get("category")
-    data = legal_db.get_training_data(category)
+@app.route('/export-docx', methods=['POST'])
+def export_docx():
+    try:
+        data = request.json
+        content = data.get('content', '')
+        filename = data.get('filename', 'legal_document')
+        
+        # Create a new Document
+        doc = Document()
+        
+        # Add content to the document
+        for line in content.split('\n'):
+            if line.strip() == '':
+                continue
+            # Check if line looks like a heading
+            if re.match(r'^[A-Z][A-Za-z\s]+:$', line) or re.match(r'^[IVX]+\.', line) or re.match(r'^[0-9]+\.', line):
+                heading = doc.add_heading(line, level=2)
+            else:
+                paragraph = doc.add_paragraph(line)
+        
+        # Save to temporary file
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.docx')
+        doc.save(temp_file.name)
+        temp_file.close()
+        
+        return send_file(
+            temp_file.name, 
+            as_attachment=True, 
+            download_name=f"{filename}.docx",
+            mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        )
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/predict-outcome', methods=['POST'])
+def predict_outcome():
+    try:
+        data = request.json
+        case_details = data.get('case_details', '')
+        jurisdiction = data.get('jurisdiction', 'India')
+        
+        # Prepare prediction prompt
+        prediction_prompt = f"""
+        Based on the following case details, provide a predictive analysis of likely outcomes:
+        
+        {case_details}
+        
+        Please include:
+        1. Assessment of strengths and weaknesses of the case
+        2. Relevant legal precedents
+        3. Potential arguments for each side
+        4. Likely outcomes with probabilities
+        5. Factors that could influence the outcome
+        
+        Remember to emphasize that this is predictive analysis only and not legal advice.
+        """
+        
+        # Call OpenAI for prediction
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": LEGAL_ASSISTANT_PROMPT},
+                {"role": "user", "content": prediction_prompt}
+            ],
+            temperature=0.3,
+            max_tokens=1500
+        )
+        
+        prediction = response.choices[0].message['content']
+        
+        return jsonify({"prediction": prediction})
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/compliance-check', methods=['POST'])
+def compliance_check():
+    try:
+        data = request.json
+        document_text = data.get('document_text', '')
+        regulations = data.get('regulations', 'Indian laws')
+        
+        # Prepare compliance check prompt
+        compliance_prompt = f"""
+        Review the following document for compliance with {regulations}:
+        
+        {document_text}
+        
+        Please provide:
+        1. Identification of potential compliance issues
+        2. Relevant legal requirements
+        3. Recommendations for addressing any issues
+        4. References to specific regulations or standards
+        """
+        
+        # Call OpenAI for compliance check
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": LEGAL_ASSISTANT_PROMPT},
+                {"role": "user", "content": compliance_prompt}
+            ],
+            temperature=0.2,
+            max_tokens=1500
+        )
+        
+        compliance_report = response.choices[0].message['content']
+        
+        return jsonify({"compliance_report": compliance_report})
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/due-diligence', methods=['POST'])
+def due_diligence():
+    try:
+        data = request.json
+        documents_text = data.get('documents_text', '')
+        transaction_type = data.get('transaction_type', 'general')
+        
+        # Prepare due diligence prompt
+        diligence_prompt = f"""
+        Perform due diligence analysis on the following documents for a {transaction_type} transaction:
+        
+        {documents_text}
+        
+        Please provide:
+        1. Identification of key risks and issues
+        2. Legal implications of identified issues
+        3. Recommendations for risk mitigation
+        4. Priority areas for further investigation
+        5. Potential impact on transaction structure
+        """
+        
+        # Call OpenAI for due diligence
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": LEGAL_ASSISTANT_PROMPT},
+                {"role": "user", "content": diligence_prompt}
+            ],
+            temperature=0.2,
+            max_tokens=2000
+        )
+        
+        diligence_report = response.choices[0].message['content']
+        
+        return jsonify({"diligence_report": diligence_report})
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/deposition-prep', methods=['POST'])
+def deposition_prep():
+    try:
+        data = request.json
+        case_details = data.get('case_details', '')
+        witness_role = data.get('witness_role', 'general')
+        
+        # Prepare deposition preparation prompt
+        deposition_prompt = f"""
+        Prepare deposition questions for a {witness_role} witness based on the following case details:
+        
+        {case_details}
+        
+        Please provide:
+        1. Background and foundational questions
+        2. Key factual questions specific to the case
+        3. Questions to establish or challenge credibility
+        4. Questions about documents or evidence
+        5. Potential follow-up questions based on likely responses
+        6. Strategy notes for the examining attorney
+        """
+        
+        # Call OpenAI for deposition preparation
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": LEGAL_ASSISTANT_PROMPT},
+                {"role": "user", "content": deposition_prompt}
+            ],
+            temperature=0.3,
+            max_tokens=1800
+        )
+        
+        deposition_questions = response.choices[0].message['content']
+        
+        return jsonify({"deposition_questions": deposition_questions})
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/health', methods=['GET'])
+def health_check():
     return jsonify({
-        "count": len(data),
-        "training_data": data
+        "status": "healthy",
+        "uptime": time.time() - app.config.get("START_TIME", time.time()),
+        "cases_loaded": len(legal_db.cases),
+        "training_examples": len(legal_db.training_data),
+        "openai_configured": bool(OPENAI_API_KEY)
     })
 
-# -----------------------------------------------------------------------------
-# Search and Case Routes
-# -----------------------------------------------------------------------------
-@app.route("/search", methods=["POST"])
-def search():
-    try:
-        data = request.get_json() or {}
-        query = (data.get("query") or "").strip()
-        if not query:
-            return jsonify({"error": "No search query provided"}), 400
-        
-        results = search_cases(query)
-        return jsonify({"results": results, "count": len(results)})
-    except Exception as e:
-        return jsonify({"error": "search_error", "message": str(e)}), 500
-
-# -----------------------------------------------------------------------------
-# Enhanced OpenAI Integrated Chat
-# -----------------------------------------------------------------------------
-def params_from_payload(data: dict):
-    model = data.get("model") or "gpt-4o-mini"
-    temperature = float(data.get("temperature") or 0.2)
-    max_tokens = int(data.get("max_tokens") or 900)
-    return model, temperature, max_tokens
-
-@app.route("/openai/chat", methods=["POST"])
-def openai_chat():
-    try:
-        data = request.get_json(silent=True) or {}
-        user_msg = (data.get("message") or "").strip()
-        history = data.get("history") or []
-        if not user_msg:
-            return jsonify({"response": "Please provide a prompt."}), 200
-
-        model, temperature, max_tokens = params_from_payload(data)
-        messages = build_enhanced_messages(user_msg, history)
-
-        resp = client.chat.completions.create(
-            model=model,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            messages=messages,
-        )
-        answer = resp.choices[0].message.content.strip()
-        # Clean the response to remove markdown formatting
-        cleaned_answer = clean_response(answer)
-        return jsonify({"response": cleaned_answer})
-    except Exception as e:
-        return jsonify({"error": "openai_error", "message": str(e)}), 500
-
-@app.route("/openai/chat-stream", methods=["POST"])
-def openai_chat_stream():
-    try:
-        data = request.get_json(silent=True) or {}
-        user_msg = (data.get("message") or "").strip()
-        history = data.get("history") or []
-        if not user_msg:
-            return Response("data: Please provide a prompt.\n\ndata: [DONE]\n\n", mimetype="text/event-stream")
-
-        model, temperature, max_tokens = params_from_payload(data)
-        messages = build_enhanced_messages(user_msg, history)
-
-        def token_stream():
-            try:
-                stream = client.chat.completions.create(
-                    model=model,
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                    messages=messages,
-                    stream=True,
-                )
-                accumulated_text = ""
-                for chunk in stream:
-                    delta = chunk.choices[0].delta
-                    if delta and getattr(delta, "content", None):
-                        content = delta.content
-                        accumulated_text += content
-                        # Clean the content in real-time
-                        cleaned_content = clean_response(content)
-                        yield f"data: {cleaned_content}\n\n"
-                yield "data: [DONE]\n\n"
-            except Exception as e:
-                yield f"data: [ERROR] {str(e)}\n\n"
-
-        return Response(stream_with_context(token_stream()), mimetype="text/event-stream")
-    except Exception as e:
-        return Response(f"data: [ERROR] {str(e)}\n\n", mimetype="text/event-stream")
-
-# -----------------------------------------------------------------------------
-# Pre-load with some legal training data
-# -----------------------------------------------------------------------------
-def preload_training_data():
-    """Pre-load with some basic legal training data"""
-    basic_legal_qa = [
-        {
-            "question": "What is Article 21 of the Indian Constitution?",
-            "answer": "Article 21 of the Indian Constitution states: 'No person shall be deprived of his life or personal liberty except according to procedure established by law.' It has been interpreted broadly by the Supreme Court to include right to livelihood, clean environment, health, and dignity."
-        },
-        {
-            "question": "What is the difference between civil law and criminal law?",
-            "answer": "Civil law deals with disputes between individuals/organizations where compensation may be awarded to the victim. Criminal law deals with crimes against the state/society where punishment is imposed. Civil cases are filed by private parties, while criminal cases are filed by the government."
-        },
-        {
-            "question": "What is the Limitation Act in India?",
-            "answer": "The Limitation Act, 1963 prescribes time limits for different types of legal actions. For example: contract disputes - 3 years, recovery of debt - 3 years, suits relating to immovable property - 12 years. After the limitation period expires, the right to initiate legal action is extinguished."
-        }
-    ]
-    
-    for qa in basic_legal_qa:
-        legal_db.add_training_data(qa["question"], qa["answer"], "constitutional_law")
-    
-    print(f"Pre-loaded {len(basic_legal_qa)} training examples")
-
-# -----------------------------------------------------------------------------
-# Main
-# -----------------------------------------------------------------------------
 if __name__ == "__main__":
     # Pre-load some training data
     preload_training_data()
@@ -569,7 +526,7 @@ if __name__ == "__main__":
     app.config["START_TIME"] = time.time()
     print("JustiBot AI Legal Assistant starting...")
     print(f"OpenAI API Key: {'Loaded' if OPENAI_API_KEY else 'Missing'}")
-    print(f"Loaded {len(df_cases)} legal cases")
+    print(f"Loaded {len(legal_db.cases)} legal cases")
     print(f"Pre-loaded {len(legal_db.training_data)} training examples")
     
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 8080)), debug=True)
