@@ -1,11 +1,10 @@
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
-import openai
+from openai import OpenAI
 import os
 import json
 import tempfile
 from docx import Document
-from docx.shared import Pt
 from datetime import datetime
 import PyPDF2
 import re
@@ -18,7 +17,7 @@ CORS(app)
 
 # Initialize OpenAI (you'll need to set your API key in environment variables)
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-openai.api_key = OPENAI_API_KEY
+client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 
 # In-memory storage for demo purposes (use a database in production)
 chat_sessions = {}
@@ -52,10 +51,39 @@ class LegalDatabase:
     
     def load_cases_from_csv(self, filepath):
         try:
-            df = pd.read_csv(filepath)
-            self.cases = df.to_dict('records')
+            # Create data directory if it doesn't exist
+            os.makedirs(os.path.dirname(filepath), exist_ok=True)
+            
+            # Check if file exists, if not create a sample one
+            if not os.path.exists(filepath):
+                sample_cases = pd.DataFrame([
+                    {
+                        "case_no": "AIR 1973 SC 1461",
+                        "title": "Kesavananda Bharati vs State of Kerala",
+                        "year": 1973,
+                        "court": "Supreme Court of India",
+                        "summary": "Landmark case that established the Basic Structure Doctrine of the Constitution",
+                        "key_issues": "Constitutional amendments, Fundamental rights, Basic structure doctrine",
+                        "outcome": "The Supreme Court outlined the basic structure doctrine of the Constitution"
+                    },
+                    {
+                        "case_no": "AIR 1980 SC 1789",
+                        "title": "Minerva Mills Ltd. vs Union of India",
+                        "year": 1980,
+                        "court": "Supreme Court of India",
+                        "summary": "Strengthened the basic structure doctrine laid down in Kesavananda Bharati case",
+                        "key_issues": "Constitutional amendments, Judicial review, Fundamental rights",
+                        "outcome": "Struck down parts of the 42nd Amendment that prevented judicial review of constitutional amendments"
+                    }
+                ])
+                sample_cases.to_csv(filepath, index=False)
+                self.cases = sample_cases.to_dict('records')
+            else:
+                df = pd.read_csv(filepath)
+                self.cases = df.to_dict('records')
             return len(self.cases)
-        except:
+        except Exception as e:
+            print(f"Error loading cases: {e}")
             # Return dummy data if file not found
             self.cases = [
                 {
@@ -121,6 +149,9 @@ def serve_index():
 @app.route('/openai/chat', methods=['POST'])
 def chat_with_openai():
     try:
+        if not client:
+            return jsonify({"error": "OpenAI API key not configured"}), 500
+            
         data = request.json
         user_message = data.get('message', '')
         history = data.get('history', [])
@@ -136,20 +167,21 @@ def chat_with_openai():
         # Add current message
         messages.append({"role": "user", "content": user_message})
         
-        # Call OpenAI API
-        response = openai.ChatCompletion.create(
+        # Call OpenAI API with the new client format
+        response = client.chat.completions.create(
             model=model,
             messages=messages,
             temperature=0.2,
             max_tokens=900
         )
         
-        ai_response = response.choices[0].message['content']
+        ai_response = response.choices[0].message.content
         
         return jsonify({"response": ai_response})
     
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        print(f"OpenAI API error: {e}")
+        return jsonify({"error": "I'm having trouble connecting to the AI service. Please try again."}), 500
 
 @app.route('/openai/chat-stream', methods=['POST'])
 def chat_with_openai_stream():
@@ -181,6 +213,9 @@ def upload_document():
 @app.route('/analyze-documents', methods=['POST'])
 def analyze_documents():
     try:
+        if not client:
+            return jsonify({"error": "OpenAI API key not configured"}), 500
+            
         data = request.json
         session_id = data.get('session_id', 'default')
         question = data.get('question', '')
@@ -208,7 +243,7 @@ def analyze_documents():
         """
         
         # Call OpenAI for analysis
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": LEGAL_ASSISTANT_PROMPT},
@@ -218,7 +253,7 @@ def analyze_documents():
             max_tokens=1500
         )
         
-        analysis = response.choices[0].message['content']
+        analysis = response.choices[0].message.content
         
         return jsonify({"analysis": analysis})
     
@@ -228,6 +263,9 @@ def analyze_documents():
 @app.route('/draft-document', methods=['POST'])
 def draft_document():
     try:
+        if not client:
+            return jsonify({"error": "OpenAI API key not configured"}), 500
+            
         data = request.json
         doc_type = data.get('type', 'contract')
         requirements = data.get('requirements', '')
@@ -247,7 +285,7 @@ def draft_document():
         """
         
         # Call OpenAI for drafting
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": LEGAL_ASSISTANT_PROMPT},
@@ -257,7 +295,7 @@ def draft_document():
             max_tokens=2000
         )
         
-        draft = response.choices[0].message['content']
+        draft = response.choices[0].message.content
         
         return jsonify({"draft": draft})
     
@@ -289,36 +327,42 @@ def find_judgments():
                 "source": "local_database"
             })
         
-        # If no local matches, use OpenAI to find relevant judgments
-        judgment_prompt = f"""
-        Based on your knowledge of Indian case law, provide information about relevant judgments for the following legal issue:
-        
-        {issue}
-        
-        Please include:
-        1. Key case names and citations
-        2. Summary of legal principles established
-        3. Relevance to the issue presented
-        4. Any limitations or subsequent developments
-        """
-        
-        # Call OpenAI for judgment search
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": LEGAL_ASSISTANT_PROMPT},
-                {"role": "user", "content": judgment_prompt}
-            ],
-            temperature=0.2,
-            max_tokens=1500
-        )
-        
-        judgments = response.choices[0].message['content']
-        
-        return jsonify({
-            "judgments": judgments,
-            "source": "openai"
-        })
+        # If no local matches and OpenAI is available, use it to find relevant judgments
+        if client:
+            judgment_prompt = f"""
+            Based on your knowledge of Indian case law, provide information about relevant judgments for the following legal issue:
+            
+            {issue}
+            
+            Please include:
+            1. Key case names and citations
+            2. Summary of legal principles established
+            3. Relevance to the issue presented
+            4. Any limitations or subsequent developments
+            """
+            
+            # Call OpenAI for judgment search
+            response = client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": LEGAL_ASSISTANT_PROMPT},
+                    {"role": "user", "content": judgment_prompt}
+                ],
+                temperature=0.2,
+                max_tokens=1500
+            )
+            
+            judgments = response.choices[0].message.content
+            
+            return jsonify({
+                "judgments": judgments,
+                "source": "openai"
+            })
+        else:
+            return jsonify({
+                "judgments": "OpenAI service not available. Please configure your API key.",
+                "source": "error"
+            })
     
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -361,6 +405,9 @@ def export_docx():
 @app.route('/predict-outcome', methods=['POST'])
 def predict_outcome():
     try:
+        if not client:
+            return jsonify({"error": "OpenAI API key not configured"}), 500
+            
         data = request.json
         case_details = data.get('case_details', '')
         jurisdiction = data.get('jurisdiction', 'India')
@@ -382,7 +429,7 @@ def predict_outcome():
         """
         
         # Call OpenAI for prediction
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": LEGAL_ASSISTANT_PROMPT},
@@ -392,7 +439,7 @@ def predict_outcome():
             max_tokens=1500
         )
         
-        prediction = response.choices[0].message['content']
+        prediction = response.choices[0].message.content
         
         return jsonify({"prediction": prediction})
     
@@ -402,6 +449,9 @@ def predict_outcome():
 @app.route('/compliance-check', methods=['POST'])
 def compliance_check():
     try:
+        if not client:
+            return jsonify({"error": "OpenAI API key not configured"}), 500
+            
         data = request.json
         document_text = data.get('document_text', '')
         regulations = data.get('regulations', 'Indian laws')
@@ -420,7 +470,7 @@ def compliance_check():
         """
         
         # Call OpenAI for compliance check
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": LEGAL_ASSISTANT_PROMPT},
@@ -430,7 +480,7 @@ def compliance_check():
             max_tokens=1500
         )
         
-        compliance_report = response.choices[0].message['content']
+        compliance_report = response.choices[0].message.content
         
         return jsonify({"compliance_report": compliance_report})
     
@@ -440,6 +490,9 @@ def compliance_check():
 @app.route('/due-diligence', methods=['POST'])
 def due_diligence():
     try:
+        if not client:
+            return jsonify({"error": "OpenAI API key not configured"}), 500
+            
         data = request.json
         documents_text = data.get('documents_text', '')
         transaction_type = data.get('transaction_type', 'general')
@@ -459,7 +512,7 @@ def due_diligence():
         """
         
         # Call OpenAI for due diligence
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": LEGAL_ASSISTANT_PROMPT},
@@ -469,7 +522,7 @@ def due_diligence():
             max_tokens=2000
         )
         
-        diligence_report = response.choices[0].message['content']
+        diligence_report = response.choices[0].message.content
         
         return jsonify({"diligence_report": diligence_report})
     
@@ -479,6 +532,9 @@ def due_diligence():
 @app.route('/deposition-prep', methods=['POST'])
 def deposition_prep():
     try:
+        if not client:
+            return jsonify({"error": "OpenAI API key not configured"}), 500
+            
         data = request.json
         case_details = data.get('case_details', '')
         witness_role = data.get('witness_role', 'general')
@@ -499,7 +555,7 @@ def deposition_prep():
         """
         
         # Call OpenAI for deposition preparation
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": LEGAL_ASSISTANT_PROMPT},
@@ -509,7 +565,7 @@ def deposition_prep():
             max_tokens=1800
         )
         
-        deposition_questions = response.choices[0].message['content']
+        deposition_questions = response.choices[0].message.content
         
         return jsonify({"deposition_questions": deposition_questions})
     
