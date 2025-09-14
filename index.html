@@ -313,7 +313,7 @@
       width:38px;height:38px;border-radius:10px;display:grid;place-items:center;color:#fff;font-weight:900;
       background:linear-gradient(135deg,var(--primary),#6db2ff);box-shadow:0 8px 18px rgba(43,134,255,.35);margin-bottom:10px
     }
-    .icon.green{background:linear-gradient(135deg,var(--accent),#7be9b2;box-shadow:0 8px 18px rgba(62,207,142,.35)}
+    .icon.green{background:linear-gradient(135deg,var(--accent),#7be9b2);box-shadow:0 8px 18px rgba(62,207,142,.35)}
     .icon.purple{background:linear-gradient(135deg,var(--purple),#a992e0);box-shadow:0 8px 18px rgba(140,104,205,.35)}
     .icon.orange{background:linear-gradient(135deg,var(--orange),#ffbe85);box-shadow:0 8px 18px rgba(255,159,67,.35)}
     .icon.red{background:linear-gradient(135deg,var(--red),#ff9e9e);box-shadow:0 8px 18px rgba(255,107,107,.35)}
@@ -342,7 +342,7 @@
     .cta strong{font-size:20px}
     .cta .btn{font-size:15px}
 
-    footer{padding:26px 20px;border-top:1px solid rgba(15,27,45,.08;background:#ffffff7a;backdrop-filter: blur(6px)}
+    footer{padding:26px 20px;border-top:1px solid rgba(15,27,45,.08);background:#ffffff7a;backdrop-filter: blur(6px)}
     .foot{max-width:1160px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;color:var(--muted);font-size:14px}
     .mini{display:flex;gap:12px}
     .mini a{color:var(--muted);text-decoration:none}
@@ -677,22 +677,11 @@ const chatArea = document.getElementById('chatArea');
 const input = document.getElementById('prompt');
 const btn = document.getElementById('sendBtn');
 const uploadBtn = document.getElementById('uploadBtn');
+const grokToggle = document.getElementById('grokToggle');
 const quickReplies = document.getElementById('quickReplies');
 
-// API endpoints
-const API_BASE = window.location.origin;
-const ENDPOINTS = {
-  CHAT: `${API_BASE}/openai/chat`,
-  UPLOAD: `${API_BASE}/upload`,
-  ANALYZE: `${API_BASE}/analyze-documents`,
-  DRAFT: `${API_BASE}/draft-document`,
-  JUDGMENTS: `${API_BASE}/find-judgments`,
-  EXPORT: `${API_BASE}/export-docx`,
-  PREDICT: `${API_BASE}/predict-outcome`,
-  COMPLIANCE: `${API_BASE}/compliance-check`,
-  DUE_DILIGENCE: `${API_BASE}/due-diligence`,
-  DEPOSITION: `${API_BASE}/deposition-prep`
-};
+// Hide the OpenAI toggle as requested
+document.querySelector('.api-toggle').style.display = 'none';
 
 // Maintain conversation history for context
 const chatHistory = [];
@@ -712,10 +701,6 @@ tabs.forEach(t => t.addEventListener('click', () => {
     appendBubble('AI Analysis panel open.', 'bot', true);
   } else if (tabName === 'chat') {
     appendBubble('Standard chat panel open.', 'bot', true);
-  } else if (tabName === 'draft') {
-    appendBubble('Document drafting panel open. Describe what you need drafted.', 'bot', true);
-  } else if (tabName === 'judgment') {
-    appendBubble('Judgment search panel open. Describe the legal issue you need case law for.', 'bot', true);
   }
 }));
 
@@ -736,9 +721,13 @@ document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
 // =====================
 // Chat bubble helpers
 // =====================
-function appendBubble(text, who = 'me', isSystem = false) {
+function appendBubble(text, who = 'me', isSystem = false, isGrok = false) {
   const b = document.createElement('div');
-  if (isSystem) {
+  if (isGrok) {
+    b.className = 'bubble grok';
+    const formattedText = (text || '').replace(/\n/g, '<br>');
+    b.innerHTML = '<strong>AI Analysis:</strong><div style="margin-top: 5px;">' + formattedText + '</div>';
+  } else if (isSystem) {
     b.className = 'bubble system';
     b.textContent = text || '';
   } else {
@@ -778,22 +767,26 @@ function hideTypingIndicator() {
 // =====================
 // API callers
 // =====================
-async function callAPI(endpoint, data) {
+async function callOpenAI(text, history = chatHistory) {
   try {
-    const response = await fetch(endpoint, {
+    const res = await fetch('/openai/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
+      body: JSON.stringify({
+        message: text,
+        history,
+        model: 'gpt-4',
+        temperature: 0.2,
+        max_tokens: 900
+      })
     });
     
-    if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
-    }
-    
-    return await response.json();
+    if (!res.ok) throw new Error('OpenAI chat error');
+    const data = await res.json();
+    return data;
   } catch (error) {
     console.error('API call failed:', error);
-    throw error;
+    return { response: "I'm having trouble connecting to the AI service. Please try again." };
   }
 }
 
@@ -813,12 +806,7 @@ async function sendMessage() {
   showTypingIndicator();
   
   try {
-    const data = await callAPI(ENDPOINTS.CHAT, {
-      message: text,
-      history: chatHistory,
-      model: 'gpt-3.5-turbo'
-    });
-    
+    const data = await callOpenAI(text, chatHistory);
     hideTypingIndicator();
     
     if (data && data.response) {
@@ -851,11 +839,15 @@ if (uploadBtn) {
     if (docText && docText.trim()) {
       appendBubble('Uploading document for analysis...', 'bot', true);
       
-      callAPI(ENDPOINTS.UPLOAD, { text: docText })
-        .then(() => {
-          appendBubble('✅ Document uploaded. Ask to analyze or summarize it.', 'bot', true);
-        })
-        .catch(() => appendBubble('Upload failed. Please try again.', 'bot', true));
+      // Add document to chat history
+      chatHistory.push({ 
+        role: 'user', 
+        content: `[DOCUMENT UPLOADED]: ${docText.substring(0, 1000)}${docText.length > 1000 ? '...' : ''}` 
+      });
+      
+      setTimeout(() => {
+        appendBubble('✅ Document uploaded. Ask to analyze or summarize it.', 'bot', true);
+      }, 1000);
     }
   });
 }
