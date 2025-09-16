@@ -1135,6 +1135,126 @@ appendInitialGreeting();
 document.addEventListener('click', () => {
   input && input.focus();
 });
+
+// =====================
+// Enhanced Features
+// =====================
+
+// Justice dataset search function
+async function searchJusticeDataset(query) {
+  try {
+    const response = await fetch('/api/justice-search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: query, top_n: 3 })
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      return data.results;
+    }
+    return [];
+  } catch (error) {
+    console.error('Justice search error:', error);
+    return [];
+  }
+}
+
+// Enhanced send message with justice dataset fallback
+async function sendEnhancedMessage() {
+  const text = input.value.trim();
+  if (!text) return;
+  
+  appendBubble(text, 'me');
+  input.value = '';
+  
+  // Maintain history for context (user turn)
+  chatHistory.push({ role: 'user', content: text });
+  
+  showTypingIndicator();
+  
+  try {
+    // First try OpenAI
+    const data = await callOpenAI(text, chatHistory);
+    hideTypingIndicator();
+    
+    if (data && data.response) {
+      appendBubble(data.response, 'bot');
+      // Maintain history for context (assistant turn)
+      chatHistory.push({ role: 'assistant', content: stripHTML(data.response) });
+    } else {
+      // If OpenAI fails, try justice dataset
+      const similarCases = await searchJusticeDataset(text);
+      if (similarCases.length > 0) {
+        const bestMatch = similarCases[0];
+        const responseText = `I found a relevant case in our database:\n\n${bestMatch.case_name || 'Case'}: ${bestMatch.facts || 'No details available'}\n\n[Similarity: ${(bestMatch.similarity * 100).toFixed(1)}%]`;
+        appendBubble(responseText, 'bot');
+        chatHistory.push({ role: 'assistant', content: responseText });
+      } else {
+        appendBubble('I could not find a specific answer to your question. Please try rephrasing or ask about general legal concepts.', 'bot');
+      }
+    }
+  } catch (err) {
+    hideTypingIndicator();
+    console.error('API error:', err);
+    appendBubble('Error contacting server. Please try again.', 'bot');
+  }
+}
+
+// Replace original sendMessage with enhanced version
+btn.onclick = sendEnhancedMessage;
+input.onkeydown = (e) => {
+  if (e.key === 'Enter') {
+    sendEnhancedMessage();
+  }
+};
+
+// Add keyboard shortcut for clearing chat
+document.addEventListener('keydown', (e) => {
+  if (e.ctrlKey && e.key === 'k') {
+    e.preventDefault();
+    if (confirm('Clear all chat messages?')) {
+      chatArea.innerHTML = '';
+      chatHistory.length = 0;
+      currentSessionId = 'default-' + Date.now();
+      appendInitialGreeting();
+    }
+  }
+});
+
+// Auto-scroll to bottom when new messages are added
+const observerOptions = {
+  childList: true,
+  subtree: true
+};
+
+const chatObserver = new MutationObserver(() => {
+  chatArea.scrollTop = chatArea.scrollHeight;
+});
+
+chatObserver.observe(chatArea, observerOptions);
+
+// Export chat functionality
+function exportChat() {
+  const chatText = chatHistory.map(msg => {
+    const role = msg.role === 'user' ? 'You' : 'JustiBot';
+    return `${role}: ${msg.content}`;
+  }).join('\n\n');
+  
+  const blob = new Blob([chatText], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `justibot-chat-${currentSessionId}.txt`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// Add export button functionality if needed
+// document.getElementById('exportBtn').addEventListener('click', exportChat);
+
+// Initialize the application
+console.log('JustiBot Legal Assistant initialized successfully');
 </script>
 </body>
 </html>
