@@ -21,6 +21,20 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import joblib
 
+# Import LexNLP components
+try:
+    from lexnlp.nlp.en.segments.sentences import get_sentence_list
+    from lexnlp.nlp.en.tokens import get_token_list
+    from lexnlp.extract.en.amounts import get_amounts
+    from lexnlp.extract.en.dates import get_dates
+    from lexnlp.extract.en.citations import get_citations
+    from lexnlp.extract.en.entities import get_entities
+    from lexnlp.extract.en.definitions import get_definitions
+    LEXNLP_AVAILABLE = True
+except ImportError:
+    LEXNLP_AVAILABLE = False
+    print("LexNLP not available. Some features will be limited.")
+
 app = Flask(__name__)
 CORS(app)
 
@@ -89,6 +103,18 @@ def init_db():
                 usage_count INTEGER DEFAULT 1,
                 last_used TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS document_analysis (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id TEXT,
+                document_id INTEGER,
+                analysis_type TEXT,
+                results TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (session_id) REFERENCES chat_sessions (id),
+                FOREIGN KEY (document_id) REFERENCES uploaded_documents (id)
             )
         ''')
         conn.commit()
@@ -540,6 +566,66 @@ def extract_text_from_pdf(file_content):
         app.logger.error(f"PDF extraction error: {e}")
         return ""
 
+def analyze_document_with_lexnlp(text):
+    """Analyze legal document using LexNLP"""
+    analysis = {}
+    
+    if not LEXNLP_AVAILABLE:
+        return {"error": "LexNLP not available for document analysis"}
+    
+    try:
+        # Extract sentences
+        analysis["sentences"] = get_sentence_list(text)
+        
+        # Extract monetary amounts
+        analysis["amounts"] = list(get_amounts(text))
+        
+        # Extract dates
+        analysis["dates"] = [str(date) for date in get_dates(text)]
+        
+        # Extract legal citations
+        analysis["citations"] = list(get_citations(text))
+        
+        # Extract entities (organizations, persons, etc.)
+        analysis["entities"] = get_entities(text)
+        
+        # Extract definitions
+        analysis["definitions"] = list(get_definitions(text))
+        
+        # Count sentences and tokens
+        analysis["sentence_count"] = len(analysis["sentences"])
+        analysis["token_count"] = len(get_token_list(text))
+        
+        # Extract key legal provisions using regex patterns
+        analysis["legal_provisions"] = extract_legal_provisions(text)
+        
+    except Exception as e:
+        app.logger.error(f"LexNLP analysis error: {e}")
+        analysis["error"] = f"Analysis error: {str(e)}"
+    
+    return analysis
+
+def extract_legal_provisions(text):
+    """Extract legal provisions using regex patterns"""
+    provisions = []
+    
+    # Pattern for Indian legal sections (e.g., Section 302 IPC, Article 14)
+    patterns = [
+        r'(Section|S\.|s\.|§)\s*(\d+[A-Z]*)\s*(IPC|CrPC|CPC|Constitution|Indian Contract Act)',
+        r'(Article|Art\.)\s*(\d+[A-Z]*)\s*(of the Constitution|Constitution)',
+        r'(IPC|Indian Penal Code|CrPC|Criminal Procedure Code|CPC|Civil Procedure Code)\s*[Ss]ection\s*(\d+[A-Z]*)',
+        r'(\d+[A-Z]*)\s*of\s*(the\s*)?(IPC|Indian Penal Code|CrPC|Criminal Procedure Code|CPC|Civil Procedure Code|Constitution)'
+    ]
+    
+    for pattern in patterns:
+        matches = re.finditer(pattern, text, re.IGNORECASE)
+        for match in matches:
+            provision = match.group(0).strip()
+            if provision not in provisions:
+                provisions.append(provision)
+    
+    return provisions
+
 def get_fallback_response(user_message):
     """Generate a fallback response when OpenAI API is unavailable"""
     user_message_lower = user_message.lower()
@@ -739,9 +825,72 @@ def get_justice_dataset():
         app.logger.error(f"Justice dataset info error: {e}")
         return jsonify({"error": str(e)}), 500
 
-# [Keep all your other routes the same - /upload, /analyze-documents, /draft-document, etc.]
+@app.route('/api/analyze-document', methods=['POST'])
+@limiter.limit("5 per minute")
+def analyze_document():
+    """Analyze uploaded legal document using LexNLP"""
+    try:
+        track_api_usage('/api/analyze-document')
+        
+        if 'file' not in request.files:
+            return jsonify({"error": "No file provided"}), 400
+        
+        file = request.files['file']
+        session_id = request.form.get('session_id', 'default')
+        
+        if file.filename == '':
+            return jsonify({"error": "No file selected"}), 400
+        
+        # Read file content
+        file_content = file.read()
+        filename = file.filename
+        file_type = filename.split('.')[-1].lower()
+        
+        # Extract text based on file type
+        text = ""
+        if file_type == 'pdf':
+            text = extract_text_from_pdf(file_content)
+        elif file_type in ['txt', 'md']:
+            text = file_content.decode('utf-8')
+        elif file_type == 'docx':
+            # For DOCX files, we'd need python-docx library
+            text = "DOCX file support requires additional libraries"
+        else:
+            return jsonify({"error": f"Unsupported file type: {file_type}"}), 400
+        
+        # Save document to database
+        with db_connection() as conn:
+            cursor = conn.execute(
+                "INSERT INTO uploaded_documents (session_id, text, filename, file_type) VALUES (?, ?, ?, ?)",
+                (session_id, text, filename, file_type)
+            )
+            document_id = cursor.lastrowid
+            conn.commit()
+        
+        # Analyze document with LexNLP
+        analysis = analyze_document_with_lexnlp(text)
+        
+        # Save analysis to database
+        with db_connection() as conn:
+            conn.execute(
+                "INSERT INTO document_analysis (session_id, document_id, analysis_type, results) VALUES (?, ?, ?, ?)",
+                (session_id, document_id, "lexnlp_analysis", json.dumps(analysis))
+            )
+            conn.commit()
+        
+        return jsonify({
+            "document_id": document_id,
+            "filename": filename,
+            "file_type": file_type,
+            "text_preview": text[:500] + "..." if len(text) > 500 else text,
+            "analysis": analysis
+        })
+    
+    except Exception as e:
+        app.logger.error(f"Document analysis error: {e}")
+        return jsonify({"error": str(e)}), 500
 
-@app.route('/health', methods=['GET'])
+@app.route('/api/health', methods=['GET'])
 def health_check():
     return jsonify({
         "status": "healthy",
@@ -752,8 +901,42 @@ def health_check():
         "justice_dataset_size": len(legal_db.justice_dataset) if legal_db.justice_dataset is not None else 0,
         "openai_configured": bool(OPENAI_API_KEY),
         "openai_available": client is not None,
+        "lexnlp_available": LEXNLP_AVAILABLE,
         "fallback_mode": client is None or not OPENAI_API_KEY
     })
+
+@app.route('/api/lexnlp-status', methods=['GET'])
+def lexnlp_status():
+    """Check LexNLP availability and functionality"""
+    test_text = "The contract amount is $1,000,000 payable by January 1, 2025. See Section 302 IPC and Article 14 of the Constitution."
+    
+    if not LEXNLP_AVAILABLE:
+        return jsonify({
+            "available": False,
+            "error": "LexNLP not installed. Please install with: pip install lexnlp --no-deps && pip install beautifulsoup4 dateparser unidecode"
+        })
+    
+    try:
+        # Test LexNLP functionality
+        test_analysis = {
+            "sentences": get_sentence_list(test_text),
+            "amounts": list(get_amounts(test_text)),
+            "dates": [str(date) for date in get_dates(test_text)],
+            "citations": list(get_citations(test_text)),
+            "legal_provisions": extract_legal_provisions(test_text)
+        }
+        
+        return jsonify({
+            "available": True,
+            "test_text": test_text,
+            "test_results": test_analysis
+        })
+    
+    except Exception as e:
+        return jsonify({
+            "available": False,
+            "error": f"LexNLP installed but not functioning: {str(e)}"
+        })
 
 if __name__ == "__main__":
     # Create necessary directories
@@ -769,11 +952,15 @@ if __name__ == "__main__":
     app.logger.info("JustiBot AI Legal Assistant starting...")
     app.logger.info(f"OpenAI API Key: {'Loaded' if OPENAI_API_KEY else 'Missing'}")
     app.logger.info(f"OpenAI Client: {'Available' if client else 'Not available'}")
+    app.logger.info(f"LexNLP Available: {LEXNLP_AVAILABLE}")
     app.logger.info(f"Loaded {len(legal_db.cases)} legal cases")
     app.logger.info(f"Pre-loaded {len(legal_db.training_data)} training examples")
     app.logger.info(f"Justice dataset: {'Loaded' if legal_db.justice_dataset is not None else 'Not available'}")
     
     if not client or not OPENAI_API_KEY:
         app.logger.warning("Running in fallback mode - OpenAI API not available")
+    
+    if not LEXNLP_AVAILABLE:
+        app.logger.warning("LexNLP not available - document analysis features will be limited")
     
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 8080)), debug=True)
