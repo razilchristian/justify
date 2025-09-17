@@ -1,0 +1,2 @@
+[console_scripts]
+zahlwort2num-covert = zahlwort2num.command_line:main

@@ -1,0 +1,6 @@
+#!C:\wamp64\www\AIchatbotlegalassistance\venv\Scripts\python.exe
+
+import sys
+
+import zahlwort2num as w2n
+print(w2n.convert(sys.argv[1]))
